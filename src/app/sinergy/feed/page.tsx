@@ -101,11 +101,11 @@ export default function NewsFeedPage() {
                 <button
                     onClick={handleForceRefresh}
                     disabled={isRefreshing}
-                    className="group relative px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white rounded-xl shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center gap-2 font-medium"
+                    className="group relative px-6 py-2.5 bg-transparent border border-emerald-500/50 hover:border-emerald-500 text-emerald-400 hover:text-emerald-300 rounded-xl shadow-lg shadow-emerald-900/10 hover:shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center gap-2 font-medium"
                 >
-                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
+                    <div className="absolute inset-0 bg-emerald-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
                     {isRefreshing ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-white" />
+                        <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
                     ) : (
                         <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
                     )}
@@ -144,7 +144,7 @@ export default function NewsFeedPage() {
                                         href={item.original_url}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="p-2.5 text-neutral-500 hover:text-sky-400 hover:bg-sky-950/30 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-sky-500/30"
+                                        className="p-2.5 text-sky-500 bg-sky-950/10 hover:bg-sky-950/30 rounded-xl transition-all flex items-center justify-center border border-sky-500/20 hover:border-sky-500/50"
                                         title="Читать источник"
                                     >
                                         <ExternalLink className="w-5 h-5" />
@@ -153,7 +153,7 @@ export default function NewsFeedPage() {
                                 <button
                                     onClick={() => handleArchive(item)}
                                     disabled={archivingId === item.id}
-                                    className="p-2.5 text-neutral-500 hover:text-emerald-400 hover:bg-emerald-950/30 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-emerald-500/30 disabled:opacity-50"
+                                    className="p-2.5 text-emerald-500 bg-emerald-950/10 hover:bg-emerald-950/30 rounded-xl transition-all flex items-center justify-center border border-emerald-500/20 hover:border-emerald-500/50 disabled:opacity-50"
                                     title="В Архив"
                                 >
                                     {archivingId === item.id ? (
@@ -164,7 +164,7 @@ export default function NewsFeedPage() {
                                 </button>
                                 <button
                                     onClick={() => handleDetailsClick(item.id)}
-                                    className="p-2.5 text-neutral-500 hover:text-violet-400 hover:bg-violet-950/30 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-violet-500/30"
+                                    className="p-2.5 text-violet-400 bg-violet-950/10 hover:bg-violet-950/30 rounded-xl transition-all flex items-center justify-center border border-violet-500/20 hover:border-violet-500/50"
                                     title="Подробный анализ"
                                 >
                                     <FileText className="w-5 h-5" />
