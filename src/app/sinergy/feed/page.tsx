@@ -61,9 +61,28 @@ export default function NewsFeedPage() {
         }
     }
 
+    const [archivingId, setArchivingId] = useState<string | null>(null)
+
     const handleArchive = async (item: any) => {
-        // Logic to "Archive" (e.g. clone to user idea or flag)
-        toast.success("Новость сохранена в Архив!")
+        if (archivingId) return
+        setArchivingId(item.id)
+
+        try {
+            const res = await fetch('/api/sinergy/ideas/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ idea: item })
+            })
+
+            if (!res.ok) throw new Error('Failed to save')
+
+            toast.success("Новость сохранена в Архив!")
+        } catch (e) {
+            toast.error("Не удалось сохранить новость.")
+            console.error(e)
+        } finally {
+            setArchivingId(null)
+        }
     }
 
     return (
@@ -82,12 +101,13 @@ export default function NewsFeedPage() {
                 <button
                     onClick={handleForceRefresh}
                     disabled={isRefreshing}
-                    className="flex items-center gap-2 px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg transition-all border border-neutral-700 hover:border-emerald-500/50"
+                    className="group relative px-6 py-2.5 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white rounded-xl shadow-lg shadow-emerald-900/20 hover:shadow-emerald-500/30 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center gap-2 font-medium"
                 >
+                    <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
                     {isRefreshing ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-emerald-500" />
+                        <Loader2 className="w-4 h-4 animate-spin text-white" />
                     ) : (
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
                     )}
                     {isRefreshing ? 'Поиск...' : 'Обновить сейчас'}
                 </button>
@@ -124,7 +144,7 @@ export default function NewsFeedPage() {
                                         href={item.original_url}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="p-2 text-neutral-400 hover:text-white hover:bg-neutral-800 rounded-lg transition-colors flex items-center justify-center"
+                                        className="p-2.5 text-neutral-500 hover:text-sky-400 hover:bg-sky-950/30 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-sky-500/30"
                                         title="Читать источник"
                                     >
                                         <ExternalLink className="w-5 h-5" />
@@ -132,14 +152,19 @@ export default function NewsFeedPage() {
                                 )}
                                 <button
                                     onClick={() => handleArchive(item)}
-                                    className="p-2 text-neutral-400 hover:text-emerald-400 hover:bg-emerald-950/30 rounded-lg transition-colors flex items-center justify-center"
+                                    disabled={archivingId === item.id}
+                                    className="p-2.5 text-neutral-500 hover:text-emerald-400 hover:bg-emerald-950/30 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-emerald-500/30 disabled:opacity-50"
                                     title="В Архив"
                                 >
-                                    <Archive className="w-5 h-5" />
+                                    {archivingId === item.id ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <Archive className="w-5 h-5" />
+                                    )}
                                 </button>
                                 <button
                                     onClick={() => handleDetailsClick(item.id)}
-                                    className="p-2 text-neutral-400 hover:text-emerald-400 hover:bg-emerald-950/30 rounded-lg transition-colors flex items-center justify-center"
+                                    className="p-2.5 text-neutral-500 hover:text-violet-400 hover:bg-violet-950/30 rounded-xl transition-all flex items-center justify-center border border-transparent hover:border-violet-500/30"
                                     title="Подробный анализ"
                                 >
                                     <FileText className="w-5 h-5" />

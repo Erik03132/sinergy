@@ -7,6 +7,7 @@ import { createClient } from '@/lib/supabase/client'
 import { Idea, DetailedAnalysis } from '@/types/sinergy'
 import { Loader2, ArrowLeft, Target, TrendingUp, ShieldAlert, Map, Swords, BarChart3, Receipt, Archive, Globe } from 'lucide-react'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 
 export default function AnalysisPage() {
     const params = useParams()
@@ -109,9 +110,69 @@ export default function AnalysisPage() {
                     </button>
                     <h1 className="font-semibold text-lg truncate flex-1">{idea.title}</h1>
 
-                    <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-neutral-900 border border-neutral-800 text-xs text-neutral-400">
-                        <Archive className="w-3 h-3" />
-                        Сохранено в Архив
+                    <div className="hidden md:flex items-center gap-2">
+                        <button
+                            onClick={async () => {
+                                const newStatus = !idea.is_favorite
+                                setIdea({ ...idea, is_favorite: newStatus })
+                                try {
+                                    await fetch('/api/sinergy/ideas/favorite', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ id: idea.id, is_favorite: newStatus })
+                                    })
+                                    toast.success(newStatus ? 'Добавлено в избранное' : 'Убрано из избранного')
+                                } catch (e) {
+                                    setIdea({ ...idea, is_favorite: !newStatus })
+                                    toast.error('Ошибка обновления')
+                                }
+                            }}
+                            className={cn(
+                                "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all text-xs font-medium cursor-pointer",
+                                idea.is_favorite
+                                    ? "bg-red-950/30 border-red-500/30 text-red-400 hover:bg-red-950/50"
+                                    : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-red-400 hover:border-red-500/30"
+                            )}
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill={idea.is_favorite ? "currentColor" : "none"}
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="w-3.5 h-3.5"
+                            >
+                                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                            </svg>
+                            {idea.is_favorite ? 'В избранном' : 'В избранное'}
+                        </button>
+
+                        <button
+                            onClick={async () => {
+                                if (!confirm('Удалить эту идею? Это действие нельзя отменить.')) return
+                                try {
+                                    await fetch('/api/sinergy/ideas/delete', {
+                                        method: 'DELETE',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ id: idea.id })
+                                    })
+                                    toast.success('Идея удалена')
+                                    router.push('/sinergy/archive')
+                                } catch (e) {
+                                    toast.error('Не удалось удалить')
+                                }
+                            }}
+                            className="p-1.5 text-neutral-500 hover:text-red-500 transition-colors"
+                            title="Удалить навсегда"
+                        >
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-900/20 transition-colors">
+                                <Archive className="w-4 h-4" /> {/* Or trash icon, sticking to Archive component import but styled as trash for delete logic or just remove icon */}
+                                {/* Actually, let's use a clear Trash icon if available, or visually Distinct */}
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                            </div>
+                        </button>
                     </div>
                 </div>
             </header>
