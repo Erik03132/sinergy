@@ -79,6 +79,9 @@ async function fetchAndStoreFeed() {
         return !existingTitles.some(existing => isSimilar(newTitle, existing))
     }
 
+    // Track titles we've seen in this run (both from DB and processed inserts)
+    const seenTitles = new Set(existingTitles)
+
     const uniqueInserts = inserts.filter((item: any) => {
         // 1. URL Check
         if (item.original_url && item.original_url !== 'N/A' && existingUrls.has(item.original_url)) {
@@ -87,11 +90,29 @@ async function fetchAndStoreFeed() {
         }
 
         // 2. Title/Fuzzy Check
-        if (!isTitleUnique(item.title)) {
+        // Check against ANY seen title (DB or previous in this batch)
+        let isDuplicate = false
+        // Exact match check
+        if (seenTitles.has(item.title)) {
+            isDuplicate = true
+        } else {
+            // Fuzzy check against all seen titles
+            // (Note: This gets slower as seenTitles grows, but for <100 items it's fine)
+            for (const seenTitle of Array.from(seenTitles)) {
+                if (isSimilar(item.title, seenTitle)) {
+                    isDuplicate = true
+                    break
+                }
+            }
+        }
+
+        if (isDuplicate) {
             console.log(`Duplicate Title found: ${item.title}`)
             return false
         }
 
+        // If unique, add to seen set so subsequent items in this batch are checked against it
+        seenTitles.add(item.title)
         return true
     })
 
