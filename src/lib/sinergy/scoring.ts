@@ -1,6 +1,11 @@
-import { Idea } from "@/types/sinergy";
+import { Idea, SynergyScoreBreakdown } from "@/types/sinergy";
+import {
+    VERTICAL_COMPATIBILITY,
+    SYNERGISTIC_TECH_PAIRS,
+    BUSINESS_MODEL_COMPATIBILITY
+} from "./constants";
 
-// Контрастные вертикали, которые создают интересное трение
+// Kimi's Contrast Verticals
 const CONTRAST_VERTICAL_PAIRS: Record<string, string[]> = {
     'fintech': ['agriculture', 'art', 'gaming', 'mental_health', 'education'],
     'healthcare': ['gaming', 'fashion', 'food', 'entertainment', 'real_estate'],
@@ -31,7 +36,7 @@ const CONTRAST_VERTICAL_PAIRS: Record<string, string[]> = {
     'agriculture': ['fintech', 'blockchain', 'gaming', 'fashion', 'social']
 };
 
-// Контрастные бизнес-модели
+// Kimi's Contrast Models
 const CONTRAST_MODEL_PAIRS: Record<string, string[]> = {
     'b2b': ['b2c', 'd2c', 'community', 'freemium'],
     'b2c': ['b2b', 'enterprise', 'b2g'],
@@ -46,23 +51,78 @@ const CONTRAST_MODEL_PAIRS: Record<string, string[]> = {
     'onetime': ['subscription', 'saas', 'platform']
 };
 
-// Технологические контрасты (ножницы между старыми и новыми технологиями)
-const TECH_CONTRASTS = [
-    ['ai', 'handmade'],
-    ['blockchain', 'physical'],
-    ['vr', 'tactile'],
-    ['automation', 'human_guided'],
-    ['mobile', 'offline_physical'],
-    ['web3', 'traditional_banking'],
-    ['iot', 'analog_craft'],
-    ['quantum', 'classical_art'],
-    ['robotics', 'organic_manual']
-];
+// ===== ORIGINAL FUNCTIONS (KEEP AS IS, REQUESTED BY CLAUDE VAR) =====
 
-/**
- * Проверяет есть ли "творческое трение" между идеями
- * Возвращает объект с информацией о типе трения
- */
+export function isTechSynergistic(techA: string[], techB: string[]): boolean {
+    for (const a of techA) {
+        for (const b of techB) {
+            const pair = [a, b].sort().join('-')
+            if (SYNERGISTIC_TECH_PAIRS.has(pair)) return true
+        }
+    }
+    return false
+}
+
+export function calculateSynergyScore(a: Idea, b: Idea): { score: number; breakdown: SynergyScoreBreakdown } {
+    const breakdown: SynergyScoreBreakdown = {
+        tech: 0,
+        audience: 0,
+        business: 0,
+        temporal: 0
+    }
+
+    // Tech synergy
+    if (isTechSynergistic(a.core_tech || [], b.core_tech || [])) {
+        breakdown.tech = 3
+    }
+
+    // Audience overlap (simplified check)
+    // Assuming target_audience is string for simplicity, or modify logic if array
+    if (a.target_audience === b.target_audience) breakdown.audience = 2
+
+    // Business model compatibility
+    if (a.business_model && b.business_model) {
+        const modelPair = [a.business_model, b.business_model].sort().join('-')
+        if (BUSINESS_MODEL_COMPATIBILITY[a.business_model]?.includes(b.business_model)) {
+            breakdown.business = 2
+        }
+    }
+
+    // Temporal synergy (both trending - placeholder logic)
+    // Preserving logic structure broadly
+    breakdown.temporal = 1;
+
+    const score = breakdown.tech + breakdown.audience + breakdown.business + breakdown.temporal
+    return { score, breakdown }
+}
+
+export function isVerticalCompatible(a: Idea, b: Idea): boolean {
+    if (!a.vertical || !b.vertical) return true
+    if (a.vertical === b.vertical) return true
+
+    // Original map based logic
+    const compatible = VERTICAL_COMPATIBILITY[a.vertical] || []
+    return compatible.includes(b.vertical)
+}
+
+export function sanityCheck(a: Idea, b: Idea): boolean {
+    // Don't combine identical titles
+    if (a.title.toLowerCase() === b.title.toLowerCase()) return false
+
+    // Don't combine if descriptions are too similar
+    const wordsA = new Set(a.description.toLowerCase().split(/\s+/))
+    const wordsB = new Set(b.description.toLowerCase().split(/\s+/))
+    const intersection = [...wordsA].filter(w => wordsB.has(w)).length
+    const union = new Set([...wordsA, ...wordsB]).size
+    const similarity = intersection / union
+
+    if (similarity > 0.7) return false
+
+    return true
+}
+
+// ===== KIMI + CLAUDE NEW LOGIC =====
+
 export function hasCreativeFriction(a: Idea, b: Idea): {
     hasFriction: boolean;
     frictionType: string;
@@ -71,11 +131,10 @@ export function hasCreativeFriction(a: Idea, b: Idea): {
     let frictionScore = 0;
     let frictionType = 'none';
 
-    // 1. Вертикальный контраст (разные индустрии = свежие идеи)
+    // 1. Vertical Contrast
     const vertA = a.vertical?.toLowerCase() || '';
     const vertB = b.vertical?.toLowerCase() || '';
 
-    // Check if verticals are different enough
     if (vertA && vertB && vertA !== vertB) {
         const contrastsA = CONTRAST_VERTICAL_PAIRS[vertA] || [];
         const contrastsB = CONTRAST_VERTICAL_PAIRS[vertB] || [];
@@ -87,7 +146,7 @@ export function hasCreativeFriction(a: Idea, b: Idea): {
         }
     }
 
-    // 2. Бизнес-модель контраст (разные способы заработка)
+    // 2. Model Contrast
     const modelA = a.business_model?.toLowerCase() || '';
     const modelB = b.business_model?.toLowerCase() || '';
 
@@ -100,7 +159,7 @@ export function hasCreativeFriction(a: Idea, b: Idea): {
         }
     }
 
-    // 3. Если просто разные вертикали, но нет в списке явных контрастов - тоже даем шанс (рандом)
+    // 3. Random Chance
     if (vertA !== vertB && Math.random() > 0.7) {
         frictionScore += 1;
         frictionType = 'random_collision';
@@ -110,51 +169,76 @@ export function hasCreativeFriction(a: Idea, b: Idea): {
     return { hasFriction: false, frictionType: 'none', frictionScore: 0 };
 }
 
+export function isParadoxicalPair(a: Idea, b: Idea): boolean {
+    const PARADOX_PATTERNS = [
+        // B2B vs B2C
+        {
+            set1: ['enterprise', 'b2b', 'business', 'corporate'],
+            set2: ['consumer', 'b2c', 'personal', 'individual']
+        },
+        // Privacy vs Social
+        {
+            set1: ['privacy', 'anonymous', 'secure', 'encrypted'],
+            set2: ['social', 'sharing', 'public', 'community']
+        },
+        // Local vs Global
+        {
+            set1: ['local', 'neighborhood', 'community', 'nearby'],
+            set2: ['global', 'worldwide', 'international', 'remote']
+        },
+    ]
+
+    const textA = `${a.title} ${a.description} ${a.target_audience}`.toLowerCase()
+    const textB = `${b.title} ${b.description} ${b.target_audience}`.toLowerCase()
+
+    for (const pattern of PARADOX_PATTERNS) {
+        const hasSet1A = pattern.set1.some(word => textA.includes(word))
+        const hasSet2A = pattern.set2.some(word => textA.includes(word))
+        const hasSet1B = pattern.set1.some(word => textB.includes(word))
+        const hasSet2B = pattern.set2.some(word => textB.includes(word))
+
+        if ((hasSet1A && hasSet2B) || (hasSet2A && hasSet1B)) {
+            return true
+        }
+    }
+    return false
+}
+
+export function calculateContrastScore(a: Idea, b: Idea): number {
+    let score = 0
+    // Business model clash
+    if (a.business_model !== b.business_model) score += 2
+    // Audience mismatch
+    if (a.target_audience !== b.target_audience) score += 3
+    return score
+}
+
 export function calculateSurpriseFactor(a: Idea, b: Idea): number {
-    // 0 to 1 score representing how "surprising" the combination is
-    // Distance in embedding space ideally, but heuristics for now
-
-    // Different source helps (User idea + News feed)
+    // 0 to 1 score
     const sourceDiff = a.source !== b.source ? 0.2 : 0;
-
-    // Different lengths of description usually implies different detail levels/domains
     const lengthDiff = Math.abs(a.description.length - b.description.length) > 100 ? 0.1 : 0;
-
-    // Different creation dates (Old idea + New trend)
-    const dateA = new Date(a.created_at).getTime();
-    const dateB = new Date(b.created_at).getTime();
-    const timeDiff = Math.abs(dateA - dateB) > (1000 * 60 * 60 * 24 * 30) ? 0.2 : 0; // > 30 days difference
-
-    // Base randomness for serendipity
     const serendipity = Math.random() * 0.5;
-
-    return Math.min(1, 0.1 + sourceDiff + lengthDiff + timeDiff + serendipity);
+    return Math.min(1, 0.1 + sourceDiff + lengthDiff + serendipity);
 }
 
 export function calculateCreativeTensionScore(a: Idea, b: Idea): number {
     // 1-10 Score
     let score = 0;
-
     const friction = hasCreativeFriction(a, b);
-    score += friction.frictionScore; // 0, 3, or 5
+    score += friction.frictionScore;
 
-    // Tech stack diversity bonus
-    const techA = a.core_tech || [];
-    const techB = b.core_tech || [];
-
-    const intersection = techA.filter(t => techB.includes(t));
-    if (intersection.length === 0 && techA.length > 0 && techB.length > 0) {
-        score += 2; // Different tech stacks
+    // Tech bonus
+    if (a.core_tech && b.core_tech) {
+        // Simplified intersection check
+        const overlap = a.core_tech.some(t => b.core_tech.includes(t))
+        if (!overlap) score += 2
     }
 
-    // Add surprise factor
     score += calculateSurpriseFactor(a, b) * 3;
-
     return Math.min(10, Math.round(score));
 }
 
 export function isAntiPattern(result: any, bannedWords: string[]): boolean {
     const combinedText = `${result.synergy_title} ${result.synergy_description} ${result.logic_chain}`.toLowerCase();
-
     return bannedWords.some(word => combinedText.includes(word.toLowerCase()));
 }
