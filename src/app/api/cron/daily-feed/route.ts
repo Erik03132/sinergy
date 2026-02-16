@@ -58,8 +58,29 @@ export async function GET(req: Request) {
             temporal_marker: new Date().toISOString().split('T')[0],
         }))
 
-        await supabase.from('ideas').insert(inserts)
-        return NextResponse.json({ success: true, count: inserts.length })
+        // Check for existing URLs to prevent duplicates
+        const urls = newsItems.map((i: any) => i.url).filter((u: string) => u && u !== 'N/A')
+
+        let finalInserts = inserts
+        if (urls.length > 0) {
+            const { data: existing } = await supabase
+                .from('ideas')
+                .select('original_url')
+                .in('original_url', urls)
+
+            const existingUrls = new Set(existing?.map(e => e.original_url))
+
+            finalInserts = inserts.filter((item: any) =>
+                !item.original_url || item.original_url === 'N/A' || !existingUrls.has(item.original_url)
+            )
+        }
+
+        if (finalInserts.length > 0) {
+            const { error } = await supabase.from('ideas').insert(finalInserts)
+            if (error) throw error
+        }
+
+        return NextResponse.json({ success: true, count: finalInserts.length })
 
     } catch (error) {
         console.error('Cron Error:', error)
