@@ -110,7 +110,7 @@ export default function AnalysisPage() {
                     </button>
                     <h1 className="font-semibold text-lg truncate flex-1">{idea.title}</h1>
 
-                    <div className="hidden md:flex items-center gap-2">
+                    <div className="flex items-center gap-2">
                         <button
                             onClick={async () => {
                                 const newStatus = !idea.is_favorite

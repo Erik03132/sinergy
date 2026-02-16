@@ -13,50 +13,66 @@ interface ArchiveListProps {
 export function ArchiveList({ initialIdeas }: ArchiveListProps) {
     const router = useRouter()
     const [searchQuery, setSearchQuery] = useState('')
-    const [selectedTags, setSelectedTags] = useState<string[]>([])
+    const [ideas, setIdeas] = useState<Idea[]>(initialIdeas || [])
 
-    // Extract unique tags and count them
-    const allTags = useMemo(() => {
-        if (!initialIdeas) return []
-        const tags = new Map<string, number>()
-        initialIdeas.forEach(idea => {
-            idea.core_tech?.forEach(tag => {
-                const normalized = tag.toLowerCase().trim()
-                tags.set(normalized, (tags.get(normalized) || 0) + 1)
-            })
-            // Also add vertical as a tag? Maybe separate filter.
-            // For now, let's treat verticals as distinct badges, but maybe searchable.
-        })
-        return Array.from(tags.entries())
-            .sort((a, b) => b[1] - a[1]) // Sort by count desc
-            .map(([tag]) => tag)
-    }, [initialIdeas])
+    // Extract unique tags and count them (optional usage now since filtered removed, but keeping logic if needed later or cleaning up)
+    // Actually, user asked to remove Filter, so we can probably remove `allTags` calculation if unused.
+    // Simplifying for now.
 
     const filteredIdeas = useMemo(() => {
-        if (!initialIdeas) return []
-        return initialIdeas.filter(idea => {
+        return ideas.filter(idea => {
             // Search text
             const searchContent = `${idea.title} ${idea.description} ${idea.vertical} ${idea.business_model || ''}`.toLowerCase()
-            const matchesSearch = searchContent.includes(searchQuery.toLowerCase())
-
-            // Filter tags
-            const ideaTags = (idea.core_tech || []).map(t => t.toLowerCase())
-            const matchesTags = selectedTags.length === 0 || selectedTags.every(t => ideaTags.includes(t))
-
-            return matchesSearch && matchesTags
+            return searchContent.includes(searchQuery.toLowerCase())
         })
-    }, [initialIdeas, searchQuery, selectedTags])
-
-    const toggleTag = (tag: string) => {
-        setSelectedTags(prev =>
-            prev.includes(tag)
-                ? prev.filter(t => t !== tag)
-                : [...prev, tag]
-        )
-    }
+    }, [ideas, searchQuery])
 
     const handleCardClick = (id: string) => {
         router.push(`/sinergy/analysis/${id}`)
+    }
+
+    const handleFavorite = async (e: React.MouseEvent, idea: Idea) => {
+        e.stopPropagation()
+        const newStatus = !idea.is_favorite
+
+        // Optimistic update
+        setIdeas(prev => prev.map(item =>
+            item.id === idea.id ? { ...item, is_favorite: newStatus } : item
+        ))
+
+        try {
+            await fetch('/api/sinergy/ideas/favorite', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: idea.id, is_favorite: newStatus })
+            })
+        } catch (error) {
+            console.error('Failed to toggle favorite', error)
+            // Revert
+            setIdeas(prev => prev.map(item =>
+                item.id === idea.id ? { ...item, is_favorite: !newStatus } : item
+            ))
+        }
+    }
+
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation()
+        if (!confirm('Вы уверены, что хотите удалить эту идею навсегда?')) return
+
+        // Optimistic remove
+        setIdeas(prev => prev.filter(item => item.id !== id))
+
+        try {
+            await fetch('/api/sinergy/ideas/delete', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+            })
+        } catch (error) {
+            console.error('Failed to delete', error)
+            alert('Не удалось удалить идею')
+            router.refresh()
+        }
     }
 
     return (
@@ -74,37 +90,6 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                         className="w-full bg-neutral-900/50 border border-neutral-800 rounded-xl py-3 pl-12 pr-4 text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50 transition-all"
                     />
                 </div>
-
-                {/* Popular Tags */}
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mr-2 flex items-center gap-1">
-                        <Filter className="w-3 h-3" />
-                        Фильтр:
-                    </span>
-                    {allTags.slice(0, 12).map(tag => (
-                        <button
-                            key={tag}
-                            onClick={() => toggleTag(tag)}
-                            className={cn(
-                                "px-3 py-1.5 rounded-lg text-xs font-medium border transition-all flex items-center gap-1.5",
-                                selectedTags.includes(tag)
-                                    ? "bg-emerald-950/50 border-emerald-500/50 text-emerald-400"
-                                    : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:border-neutral-700 hover:text-neutral-300"
-                            )}
-                        >
-                            {tag}
-                            {selectedTags.includes(tag) && <X className="w-3 h-3" />}
-                        </button>
-                    ))}
-                    {selectedTags.length > 0 && (
-                        <button
-                            onClick={() => setSelectedTags([])}
-                            className="text-xs text-neutral-500 hover:text-neutral-300 ml-auto underline"
-                        >
-                            Сбросить
-                        </button>
-                    )}
-                </div>
             </div>
 
             {/* Grid */}
@@ -113,40 +98,70 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                     <div
                         key={idea.id}
                         onClick={() => handleCardClick(idea.id)}
-                        className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl hover:border-emerald-500/50 hover:bg-neutral-900 transition-all group cursor-pointer relative"
+                        className="bg-neutral-900/50 border border-neutral-800 p-5 rounded-xl hover:border-emerald-500/50 hover:bg-neutral-900 transition-all group cursor-pointer relative flex flex-col h-full"
                     >
-                        <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <ArrowUpRight className="w-5 h-5 text-emerald-500" />
-                        </div>
-
                         <div className="flex justify-between items-start mb-3">
                             <span className="text-[10px] uppercase font-bold text-neutral-500 bg-neutral-950 px-2 py-1 rounded border border-neutral-900 group-hover:border-emerald-500/30 group-hover:text-emerald-500/70 transition-colors">
                                 {idea.vertical}
                             </span>
-                            <span className="text-[10px] text-neutral-600 mr-6">
+                            <span className="text-[10px] text-neutral-600">
                                 {new Date(idea.created_at).toLocaleDateString()}
                             </span>
                         </div>
 
-                        <h3 className="font-semibold text-neutral-200 mb-2 group-hover:text-emerald-400 transition-colors line-clamp-1 pr-4">
+                        <h3 className="font-semibold text-neutral-200 mb-2 group-hover:text-emerald-400 transition-colors line-clamp-2">
                             {idea.title}
                         </h3>
 
-                        <p className="text-sm text-neutral-400 line-clamp-3 mb-4 h-[60px] group-hover:text-neutral-300 transition-colors">
+                        <p className="text-sm text-neutral-400 line-clamp-3 mb-4 flex-1">
                             {idea.description}
                         </p>
 
-                        <div className="flex flex-wrap gap-1">
-                            {idea.core_tech?.slice(0, 3).map((tag, i) => (
-                                <span key={i} className="text-[10px] text-neutral-500 px-1.5 py-0.5 bg-neutral-950 rounded border border-neutral-800 group-hover:border-neutral-700 transition-colors">
-                                    {tag}
-                                </span>
-                            ))}
-                            {(idea.core_tech?.length || 0) > 3 && (
-                                <span className="text-[10px] text-neutral-600 px-1.5 py-0.5">
-                                    +{idea.core_tech!.length - 3}
-                                </span>
+                        <div className="flex items-center gap-2 pt-4 border-t border-neutral-800/50 mt-auto">
+                            {idea.original_url && idea.original_url !== 'N/A' && (
+                                <a
+                                    href={idea.original_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="p-2 text-sky-500 bg-sky-950/10 hover:bg-sky-950/30 rounded-lg transition-all border border-sky-500/20 hover:border-sky-500/50"
+                                    title="Источник"
+                                >
+                                    <ArrowUpRight className="w-4 h-4" />
+                                </a>
                             )}
+
+                            <button
+                                onClick={(e) => handleFavorite(e, idea)}
+                                className={cn(
+                                    "p-2 rounded-lg transition-all border ml-auto",
+                                    idea.is_favorite
+                                        ? "text-red-400 bg-red-950/10 border-red-500/20 hover:border-red-500/50 hover:bg-red-950/30"
+                                        : "text-neutral-500 bg-neutral-900 border-neutral-800 hover:text-red-400 hover:border-red-500/30"
+                                )}
+                                title={idea.is_favorite ? "Убрать из избранного" : "В избранное"}
+                            >
+                                <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    viewBox="0 0 24 24"
+                                    fill={idea.is_favorite ? "currentColor" : "none"}
+                                    stroke="currentColor"
+                                    strokeWidth="2"
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    className="w-4 h-4"
+                                >
+                                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+                                </svg>
+                            </button>
+
+                            <button
+                                onClick={(e) => handleDelete(e, idea.id)}
+                                className="p-2 text-neutral-500 bg-neutral-900 border border-neutral-800 hover:text-red-400 hover:border-red-500/30 rounded-lg transition-all hover:bg-red-950/10"
+                                title="Удалить"
+                            >
+                                <Archive className="w-4 h-4" />
+                            </button>
                         </div>
                     </div>
                 ))}
@@ -154,14 +169,6 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                 {filteredIdeas.length === 0 && (
                     <div className="col-span-full py-20 text-center text-neutral-500 border border-dashed border-neutral-800 rounded-2xl bg-neutral-900/30">
                         <p>По вашему запросу ничего не найдено.</p>
-                        {selectedTags.length > 0 && (
-                            <button
-                                onClick={() => setSelectedTags([])}
-                                className="text-emerald-500 hover:underline mt-2 text-sm"
-                            >
-                                Сбросить фильтры
-                            </button>
-                        )}
                     </div>
                 )}
             </div>
