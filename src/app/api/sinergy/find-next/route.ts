@@ -72,7 +72,7 @@ export async function POST() {
 
             Return JSON:
             {
-                "synergy_title": "Short catchy name (3-6 words)",
+                "synergy_title": "Equation Style Title (e.g. 'Micro-CRM + Scheduler = FreelanceOS')",
                 "synergy_description": "Detailed product hypothesis (2-3 sentences)",
                 "logic_chain": "Why this works (1 sentence)"
             }
