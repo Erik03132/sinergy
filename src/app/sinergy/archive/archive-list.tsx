@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Idea } from '@/types/sinergy'
 import { Search, Tag, X, Filter, ArrowUpRight, Archive } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 
 interface ArchiveListProps {
     initialIdeas: Idea[] | null
@@ -63,14 +64,22 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
         setIdeas(prev => prev.filter(item => item.id !== id))
 
         try {
-            await fetch('/api/sinergy/ideas/delete', {
+            const res = await fetch('/api/sinergy/ideas/delete', {
                 method: 'DELETE',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id })
             })
-        } catch (error) {
+
+            if (!res.ok) {
+                const data = await res.json()
+                throw new Error(data.error || 'Failed to delete')
+            }
+
+            router.refresh()
+        } catch (error: any) {
             console.error('Failed to delete', error)
-            alert('Не удалось удалить идею')
+            toast.error(`Ошибка при удалении: ${error.message}`)
+            // Force refresh to restore state if deletion failed
             router.refresh()
         }
     }

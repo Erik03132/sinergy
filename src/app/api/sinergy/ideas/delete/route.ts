@@ -11,16 +11,21 @@ export async function DELETE(request: Request) {
         }
 
         // Hard delete for now, or soft delete if we add deleted_at col later
-        const { error } = await supabase
+        const { data, error } = await supabase
             .from('ideas')
             .delete()
             .eq('id', id)
+            .select()
 
         if (error) {
             throw error
         }
 
-        return NextResponse.json({ status: 'success' })
+        if (!data || data.length === 0) {
+            return NextResponse.json({ error: 'Item not found or already deleted' }, { status: 404 })
+        }
+
+        return NextResponse.json({ status: 'success', count: data.length })
 
     } catch (error: any) {
         console.error('Error deleting idea:', error)
