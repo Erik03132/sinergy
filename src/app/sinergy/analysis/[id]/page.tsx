@@ -223,12 +223,12 @@ export default function AnalysisPage() {
                         </div>
                     </div>
 
-                    <h2 className="text-xl md:text-2xl font-bold leading-tight text-white tracking-tight text-justify">
+                    <h2 className="text-lg md:text-xl font-bold leading-tight text-white tracking-tight text-justify">
                         {idea.title}
                     </h2>
                     <div className="space-y-4 max-w-3xl">
                         {idea.description.split('\n').filter(p => p.trim()).map((paragraph, i) => (
-                            <p key={i} className="text-sm md:text-base text-neutral-400 leading-relaxed text-justify opacity-90">
+                            <p key={i} className="text-sm md:text-base text-neutral-400 leading-relaxed text-justify opacity-90 break-words">
                                 {paragraph}
                             </p>
                         ))}
@@ -265,8 +265,8 @@ export default function AnalysisPage() {
                         <div className="lg:col-span-2 space-y-6">
 
                             {/* Market Dynamics */}
-                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 hover:border-blue-500/20 transition-colors">
-                                <h3 className="text-xl font-bold mb-4 flex items-center gap-2 text-neutral-200">
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 hover:border-blue-500/20 transition-colors text-justify">
+                                <h3 className="text-base font-bold mb-4 flex items-center gap-2 text-neutral-200">
                                     <TrendingUp className="w-5 h-5 text-blue-500" />
                                     Динамика Рынка
                                 </h3>
@@ -277,7 +277,7 @@ export default function AnalysisPage() {
 
                             {/* Roadmap */}
                             <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 hover:border-cyan-500/20 transition-colors">
-                                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-neutral-200">
+                                <h3 className="text-base font-bold mb-6 flex items-center gap-2 text-neutral-200">
                                     <Map className="w-5 h-5 text-cyan-500" />
                                     План Запуска (Roadmap)
                                 </h3>
@@ -288,14 +288,14 @@ export default function AnalysisPage() {
                                                 {idx + 1}
                                             </div>
                                             <div className="mb-2">
-                                                <h4 className="text-white font-bold text-lg">{phase.phase}</h4>
+                                                <h4 className="text-white font-bold text-base md:text-lg">{phase.phase}</h4>
                                                 <span className="text-xs font-mono text-cyan-400 mt-1 block">
                                                     {phase.duration}
                                                 </span>
                                             </div>
                                             <ul className="space-y-2">
                                                 {phase.steps.map((step, sIdx) => (
-                                                    <li key={sIdx} className="text-neutral-400 text-sm flex items-start gap-3 group">
+                                                    <li key={sIdx} className="text-neutral-400 text-sm flex items-start gap-3 group text-justify">
                                                         <div className="w-1.5 h-1.5 rounded-full bg-neutral-700 mt-1.5 shrink-0 group-hover:bg-cyan-500 transition-colors" />
                                                         {step}
                                                     </li>
@@ -313,7 +313,7 @@ export default function AnalysisPage() {
 
                             {/* SWOT */}
                             <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 hover:border-orange-500/20 transition-colors">
-                                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-neutral-200">
+                                <h3 className="text-base font-bold mb-6 flex items-center gap-2 text-neutral-200">
                                     <ShieldAlert className="w-5 h-5 text-orange-500" />
                                     SWOT Анализ
                                 </h3>
@@ -327,7 +327,7 @@ export default function AnalysisPage() {
 
                             {/* Competitors */}
                             <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 hover:border-red-500/20 transition-colors">
-                                <h3 className="text-xl font-bold mb-6 flex items-center gap-2 text-neutral-200">
+                                <h3 className="text-base font-bold mb-6 flex items-center gap-2 text-neutral-200">
                                     <Swords className="w-5 h-5 text-red-500" />
                                     Конкуренты
                                 </h3>
@@ -349,11 +349,11 @@ export default function AnalysisPage() {
                                                     )}
                                                 </div>
                                                 <div className="space-y-1.5 pt-1">
-                                                    <div className="text-xs leading-relaxed flex gap-2">
+                                                    <div className="text-xs leading-relaxed flex gap-2 text-justify">
                                                         <span className="text-green-500 font-bold shrink-0">+</span>
                                                         <span className="text-neutral-400">{comp.strength}</span>
                                                     </div>
-                                                    <div className="text-xs leading-relaxed flex gap-2">
+                                                    <div className="text-xs leading-relaxed flex gap-2 text-justify">
                                                         <span className="text-red-500 font-bold shrink-0">-</span>
                                                         <span className="text-neutral-400">{comp.weakness}</span>
                                                     </div>
@@ -379,12 +379,12 @@ function StatCard({ label, value, sub, icon }: { label: string, value: string, s
     return (
         <div className="bg-neutral-900 border border-neutral-800 p-5 rounded-xl flex flex-col gap-3 hover:border-neutral-700 transition-colors group">
             <div className="flex items-center justify-between">
-                <div className="text-neutral-500 text-xs font-bold uppercase tracking-wider flex items-center gap-2 group-hover:text-neutral-300 transition-colors">
+                <div className="text-neutral-500 text-[10px] font-bold uppercase tracking-wider flex items-center gap-2 group-hover:text-neutral-300 transition-colors">
                     {icon} {label}
                 </div>
             </div>
-            {/* Removed truncate to allow full text display as requested, applied smaller font for harmony */}
-            <div className="text-sm text-neutral-300 leading-relaxed font-normal break-words">
+            {/* Justified text in stat card for long content */}
+            <div className="text-sm text-neutral-300 leading-relaxed font-normal break-words text-justify">
                 {value}
             </div>
             {sub && <div className="text-[10px] text-neutral-600">{sub}</div>}
@@ -402,7 +402,7 @@ function SwotSection({ title, items, color, bgColor }: { title: string, items: s
             </h4>
             <ul className="space-y-2">
                 {items.map((item, idx) => (
-                    <li key={idx} className="text-sm text-neutral-300 flex items-start gap-2.5 leading-relaxed">
+                    <li key={idx} className="text-sm text-neutral-300 flex items-start gap-2.5 leading-relaxed text-justify">
                         <span className={`w-1.5 h-1.5 rounded-full mt-1.5 shrink-0 ${bgColor}`} />
                         {item}
                     </li>
