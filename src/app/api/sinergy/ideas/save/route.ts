@@ -10,6 +10,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Data required' }, { status: 400 })
         }
 
+        // Check for duplicates
+        const { data: existing } = await supabase
+            .from('ideas')
+            .select('id')
+            .eq('source', 'saved_news')
+            .eq('metadata->>original_id', idea.id)
+            .single()
+
+        if (existing) {
+            return NextResponse.json({ status: 'already_saved', data: existing })
+        }
+
         // Clone the idea with a new source to mark it as "User Saved"
         // keeping the original ID in metadata for reference logic if needed
         const { data, error } = await supabase.from('ideas').insert({
