@@ -1,7 +1,8 @@
-
 'use client'
 
 import React, { useEffect, useState } from 'react'
+
+export const dynamic = 'force-dynamic'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Idea, DetailedAnalysis } from '@/types/sinergy'
