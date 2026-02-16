@@ -4,6 +4,8 @@ import { Archive } from 'lucide-react'
 import { ArchiveList } from './archive-list'
 
 // Server Component
+export const dynamic = 'force-dynamic'
+
 export default async function ArchivePage() {
     const supabase = await createClient()
 

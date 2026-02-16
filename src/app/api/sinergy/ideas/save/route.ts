@@ -14,7 +14,7 @@ export async function POST(request: Request) {
         const { data: existing } = await supabase
             .from('ideas')
             .select('id')
-            .eq('source', 'saved_news')
+            .eq('source', 'user') // Use valid enum 'user'
             .eq('metadata->>original_id', idea.id)
             .maybeSingle()
 
@@ -23,12 +23,11 @@ export async function POST(request: Request) {
         }
 
         // Clone the idea with a new source to mark it as "User Saved"
-        // keeping the original ID in metadata for reference logic if needed
         const { data, error } = await supabase.from('ideas').insert({
             title: idea.title,
             description: idea.description,
-            // Change source to 'saved_news' so it shows up in Archive query
-            source: 'saved_news',
+            // Use 'user' as source which is valid in DB constraint
+            source: 'user',
             vertical: idea.vertical,
             core_tech: idea.core_tech,
             target_audience: idea.target_audience,
