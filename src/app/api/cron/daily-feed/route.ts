@@ -1,5 +1,5 @@
 
-import { askPerplexity } from '@/lib/ai/perplexity'
+import { askGemini } from '@/lib/ai/gemini'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -26,9 +26,22 @@ export async function GET(req: Request) {
             2. ALL TEXT (title, summary) MUST BE IN RUSSIAN.
         `
 
-        const responseRaw = await askPerplexity([{ role: 'user', content: prompt }])
+        const responseRaw = await askGemini(prompt)
+
+        let newsItems = []
+        // Strict JSON cleanup
         const clean = responseRaw.replace(/```json/g, '').replace(/```/g, '').trim()
-        const newsItems = JSON.parse(clean)
+
+        // Attempt to extract JSON array if mixed with text
+        const jsonMatch = clean.match(/\[.*\]/s)
+        const jsonString = jsonMatch ? jsonMatch[0] : clean
+
+        try {
+            newsItems = JSON.parse(jsonString)
+        } catch (e) {
+            console.error('Failed to parse Gemini JSON. Raw response:', responseRaw)
+            throw new Error('Invalid JSON format from AI')
+        }
 
         const supabase = await createClient()
         const inserts = newsItems.map((item: any) => ({
