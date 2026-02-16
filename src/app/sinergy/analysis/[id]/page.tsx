@@ -223,7 +223,7 @@ export default function AnalysisPage() {
                         </div>
                     </div>
 
-                    <h2 className="text-lg md:text-xl font-bold leading-tight text-white tracking-tight text-justify">
+                    <h2 className="text-base md:text-lg font-bold leading-tight text-white tracking-tight text-justify">
                         {idea.title}
                     </h2>
                     <div className="space-y-4 max-w-3xl">

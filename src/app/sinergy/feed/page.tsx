@@ -101,7 +101,7 @@ export default function NewsFeedPage() {
                         <Newspaper className="w-6 h-6 text-emerald-500" />
                     </div>
                     <div>
-                        <h1 className="text-base md:text-lg font-bold text-white tracking-tight">Лента Стартапов</h1>
+                        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Лента Стартапов</h1>
                         <p className="text-xs md:text-sm text-neutral-500">Свежие идеи и кейсы до $100k</p>
                     </div>
                 </div>
