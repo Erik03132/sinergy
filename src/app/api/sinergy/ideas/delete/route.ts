@@ -22,6 +22,10 @@ export async function DELETE(request: Request) {
         }
 
         if (!data || data.length === 0) {
+            console.warn(`Delete operation returned 0 rows for ID: ${id}. Possible causes: Item not found, already deleted, or RLS restriction.`)
+            // We return 200 OK with count 0 to UI so it can remove it from view anyway? 
+            // No, UI expects success. Let's return 404 so UI knows it "wasn't there". 
+            // OR if user sees it, it means UI is stale.
             return NextResponse.json({ error: 'Item not found or already deleted' }, { status: 404 })
         }
 
