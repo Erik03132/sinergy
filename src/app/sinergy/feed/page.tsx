@@ -94,22 +94,22 @@ export default function NewsFeedPage() {
     }
 
     return (
-        <div className="p-4 md:p-8 max-w-5xl mx-auto w-full">
-            <div className="flex items-center justify-between mb-8">
+        <div className="p-4 md:p-8 max-w-5xl mx-auto w-full pb-24 lg:pb-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8 mt-2">
                 <div className="flex items-center gap-3">
-                    <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800">
+                    <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 shrink-0">
                         <Newspaper className="w-6 h-6 text-emerald-500" />
                     </div>
                     <div>
-                        <h1 className="text-3xl font-bold text-white">Лента Стартапов</h1>
-                        <p className="text-neutral-500">Свежие идеи и кейсы до $100k</p>
+                        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Лента Стартапов</h1>
+                        <p className="text-xs md:text-sm text-neutral-500">Свежие идеи и кейсы до $100k</p>
                     </div>
                 </div>
 
                 <button
                     onClick={handleForceRefresh}
                     disabled={isRefreshing}
-                    className="group relative px-6 py-2.5 bg-transparent border border-emerald-500/50 hover:border-emerald-500 text-emerald-400 hover:text-emerald-300 rounded-xl shadow-lg shadow-emerald-900/10 hover:shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center gap-2 font-medium"
+                    className="w-full sm:w-auto group relative px-6 py-2.5 bg-transparent border border-emerald-500/50 hover:border-emerald-500 text-emerald-400 hover:text-emerald-300 rounded-xl shadow-lg shadow-emerald-900/10 hover:shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-2 font-medium"
                 >
                     <div className="absolute inset-0 bg-emerald-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
                     {isRefreshing ? (

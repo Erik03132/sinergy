@@ -98,20 +98,20 @@ export default function AnalysisPage() {
     }
 
     return (
-        <div className="min-h-screen bg-black text-white pb-20">
+        <div className="min-h-screen bg-black text-white pb-24 lg:pb-20">
             {/* Header */}
             <header className="sticky top-0 z-10 border-b border-neutral-800 bg-black/80 backdrop-blur-md">
-                <div className="container mx-auto px-4 h-16 flex items-center gap-4">
+                <div className="container mx-auto px-4 h-14 md:h-16 flex items-center gap-3">
                     <button
                         onClick={() => router.back()}
-                        className="p-2 hover:bg-neutral-800 rounded-full transition-colors flex items-center gap-2 text-neutral-400 hover:text-white"
+                        className="p-1.5 hover:bg-neutral-800 rounded-full transition-colors flex items-center gap-2 text-neutral-400 hover:text-white shrink-0"
                     >
                         <ArrowLeft className="w-5 h-5" />
-                        <span className="text-sm font-medium hidden md:inline">Назад</span>
+                        <span className="text-xs font-medium hidden md:inline">Назад</span>
                     </button>
-                    <h1 className="font-semibold text-lg truncate flex-1">{idea.title}</h1>
+                    <h1 className="font-semibold text-sm md:text-lg truncate flex-1 leading-tight">{idea.title}</h1>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
                         {/* Save to Archive Button - Only for Feed items */}
                         {idea.source === 'perplexity' && (
                             <button
@@ -137,10 +137,10 @@ export default function AnalysisPage() {
                                         toast.error(`Ошибка: ${e.message}`)
                                     }
                                 }}
-                                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-950/50 transition-all text-xs font-medium cursor-pointer"
+                                className="flex items-center gap-1.5 px-2 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-950/50 transition-all text-[10px] md:text-xs font-medium cursor-pointer shrink-0"
                             >
-                                <Archive className="w-3.5 h-3.5" />
-                                В Архив
+                                <Archive className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                <span className="hidden xs:inline">Архив</span>
                             </button>
                         )}
 
@@ -154,16 +154,16 @@ export default function AnalysisPage() {
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ id: idea.id, is_favorite: newStatus })
                                     })
-                                    toast.success(newStatus ? 'Добавлено в избранное' : 'Убрано из избранного')
+                                    toast.success(newStatus ? 'Лайк!' : 'Убрано')
                                 } catch (e) {
                                     setIdea({ ...idea, is_favorite: !newStatus })
-                                    toast.error('Ошибка обновления')
+                                    toast.error('Ошибка')
                                 }
                             }}
                             className={cn(
-                                "flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all text-xs font-medium cursor-pointer",
+                                "flex items-center gap-1.5 px-2 py-1.5 rounded-full border transition-all text-[10px] md:text-xs font-medium cursor-pointer shrink-0",
                                 idea.is_favorite
-                                    ? "bg-red-950/30 border-red-500/30 text-red-400 hover:bg-red-950/50"
+                                    ? "bg-red-950/30 border-red-500/30 text-red-400"
                                     : "bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-red-400 hover:border-red-500/30"
                             )}
                         >
@@ -175,11 +175,11 @@ export default function AnalysisPage() {
                                 strokeWidth="2"
                                 strokeLinecap="round"
                                 strokeLinejoin="round"
-                                className="w-3.5 h-3.5"
+                                className="w-3 h-3 md:w-3.5 md:h-3.5"
                             >
                                 <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
                             </svg>
-                            {idea.is_favorite ? 'В избранном' : 'В избранное'}
+                            <span className="hidden xs:inline">{idea.is_favorite ? 'Изб' : 'Изб'}</span>
                         </button>
 
                         <button
@@ -208,7 +208,7 @@ export default function AnalysisPage() {
                 </div>
             </header>
 
-            <main className="container mx-auto px-4 py-8 max-w-5xl space-y-8">
+            <main className="container mx-auto px-4 py-6 md:py-8 max-w-5xl space-y-8">
 
                 {/* Hero Section */}
                 <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">

@@ -11,7 +11,7 @@ export function Sidebar() {
     const pathname = usePathname()
 
     return (
-        <aside className="w-64 border-r border-neutral-800 bg-neutral-950 flex flex-col h-screen sticky top-0">
+        <aside className="hidden lg:flex w-64 border-r border-neutral-800 bg-neutral-950 flex-col h-screen sticky top-0">
             <div className="p-6 border-b border-neutral-800">
                 <div className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                     SINERGY
