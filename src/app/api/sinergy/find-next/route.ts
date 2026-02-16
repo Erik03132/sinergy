@@ -72,8 +72,9 @@ export async function POST() {
 
             Return JSON:
             {
-                "logic_chain": "...",
-                "hypothesis": "..."
+                "synergy_title": "Short catchy name (3-6 words)",
+                "synergy_description": "Detailed product hypothesis (2-3 sentences)",
+                "logic_chain": "Why this works (1 sentence)"
             }
             OUTPUT IN RUSSIAN LANGUAGE ONLY.
         `
