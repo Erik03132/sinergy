@@ -17,6 +17,17 @@
 - Server Components по умолчанию, `'use client'` только когда необходимо
 - Route Handlers: `export async function POST(_request: Request)` если request не используется
 
+## Deployment Protocol
+- **ALWAYS** run `/pre-deploy` (or `npm run build`) locally before pushing.
+- **NEVER** treat Vercel as a compiler. If it fails locally, it will fail on Vercel.
+- If `EPERM` errors occur during build, delete `.next` folder and retry.
+
+## Technical Context
+- **Stack:** Next.js 15 (App Router), TypeScript, Tailwind, Supabase, Gemini AI.
+- **Styling:** Tailwind CSS. Use `cn()` for class merging.
+- **State:** React Hooks (`useState`, `useEffect`) and Server Actions.
+- **Database:** Supabase (Client & Server usage split).
+
 ## Качество кода
 - Перед коммитом: `npm run lint && npm run type-check` (автоматически через Husky)
 - Перед деплоем: `npm run pre-deploy` (lint + types + build + test)

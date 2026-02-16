@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 export async function GET() {
     try {
-        const supabase = await createClient()
+        // Use Admin Client to see ALL data regardless of RLS
+        const supabase = createAdminClient()
 
         // Fetch all ideas
         const { data: allIdeas } = await supabase

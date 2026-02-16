@@ -1,9 +1,10 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 export async function DELETE(request: Request) {
     try {
-        const supabase = await createClient()
+        // Use Admin Client to bypass RLS policies
+        const supabase = createAdminClient()
         const { id } = await request.json()
 
         if (!id) {
