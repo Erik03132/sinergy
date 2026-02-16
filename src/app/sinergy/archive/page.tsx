@@ -13,7 +13,7 @@ export default async function ArchivePage() {
         .order('created_at', { ascending: false })
 
     return (
-        <div className="p-8 max-w-6xl mx-auto w-full">
+        <div className="p-4 md:p-8 max-w-6xl mx-auto w-full">
             <div className="flex items-center gap-3 mb-8">
                 <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800">
                     <Archive className="w-6 h-6 text-emerald-500" />

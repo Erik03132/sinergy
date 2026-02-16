@@ -54,6 +54,30 @@ async function fetchAndStoreFeed() {
         temporal_marker: new Date().toISOString().split('T')[0],
     }))
 
+    // Check for existing URLs to prevent duplicates
+    const urls = newsItems.map((i: any) => i.url).filter((u: string) => u && u !== 'N/A')
+
+    if (urls.length > 0) {
+        const { data: existing } = await supabase
+            .from('ideas')
+            .select('original_url')
+            .in('original_url', urls)
+
+        const existingUrls = new Set(existing?.map(e => e.original_url))
+
+        // Filter inserts
+        const uniqueInserts = inserts.filter((item: any) =>
+            !item.original_url || item.original_url === 'N/A' || !existingUrls.has(item.original_url)
+        )
+
+        if (uniqueInserts.length > 0) {
+            const { error } = await supabase.from('ideas').insert(uniqueInserts)
+            if (error) throw error
+            return uniqueInserts.length
+        }
+        return 0
+    }
+
     const { error } = await supabase.from('ideas').insert(inserts)
     if (error) throw error
 

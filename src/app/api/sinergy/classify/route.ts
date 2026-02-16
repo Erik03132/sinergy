@@ -60,6 +60,18 @@ export async function POST(req: NextRequest) {
 
         const supabase = await createClient()
 
+        // Check for duplicates
+        const { data: existing } = await supabase
+            .from('ideas')
+            .select('id')
+            .eq('title', title)
+            .eq('source', 'user')
+            .single()
+
+        if (existing) {
+            return NextResponse.json(existing) // Return existing instead of creating new
+        }
+
         const newIdea = {
             source: 'user',
             title,
