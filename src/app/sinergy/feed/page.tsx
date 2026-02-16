@@ -101,7 +101,7 @@ export default function NewsFeedPage() {
                         <Newspaper className="w-6 h-6 text-emerald-500" />
                     </div>
                     <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Лента Стартапов</h1>
+                        <h1 className="text-base md:text-lg font-bold text-white tracking-tight">Лента Стартапов</h1>
                         <p className="text-xs md:text-sm text-neutral-500">Свежие идеи и кейсы до $100k</p>
                     </div>
                 </div>
@@ -138,10 +138,10 @@ export default function NewsFeedPage() {
                                         {new Date(item.created_at).toLocaleDateString()}
                                     </span>
                                 </div>
-                                <h3 className="text-xl font-semibold text-neutral-200 group-hover:text-emerald-400 transition-colors">
+                                <h3 className="text-lg md:text-xl font-semibold text-neutral-200 group-hover:text-emerald-400 transition-colors text-justify">
                                     {item.title}
                                 </h3>
-                                <p className="text-neutral-400 leading-relaxed text-sm">
+                                <p className="text-neutral-400 leading-relaxed text-sm text-justify">
                                     {item.description}
                                 </p>
                             </div>

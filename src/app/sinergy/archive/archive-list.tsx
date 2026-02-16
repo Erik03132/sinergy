@@ -118,7 +118,7 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                             </span>
                         </div>
 
-                        <h3 className="font-semibold text-neutral-200 mb-2 group-hover:text-emerald-400 transition-colors line-clamp-2">
+                        <h3 className="font-semibold text-neutral-200 mb-2 group-hover:text-emerald-400 transition-colors line-clamp-2 text-justify">
                             {idea.title}
                         </h3>
 
