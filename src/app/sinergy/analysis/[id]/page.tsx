@@ -132,8 +132,8 @@ export default function AnalysisPage() {
                                             toast.success("Сохранено в Архив!")
                                             // Optionally redirect to the new archived version or just stay
                                         }
-                                    } catch (e) {
-                                        toast.error("Не удалось сохранить")
+                                    } catch (e: any) {
+                                        toast.error(`Ошибка: ${e.message}`)
                                     }
                                 }}
                                 className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-950/50 transition-all text-xs font-medium cursor-pointer"

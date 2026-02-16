@@ -16,7 +16,7 @@ export async function POST(request: Request) {
             .select('id')
             .eq('source', 'saved_news')
             .eq('metadata->>original_id', idea.id)
-            .single()
+            .maybeSingle()
 
         if (existing) {
             return NextResponse.json({ status: 'already_saved', data: existing })
@@ -46,13 +46,14 @@ export async function POST(request: Request) {
         }).select().single()
 
         if (error) {
-            throw error
+            console.error('Supabase Insert Error:', error)
+            throw new Error(error.message)
         }
 
         return NextResponse.json({ status: 'success', data })
 
     } catch (error: any) {
         console.error('Error saving idea:', error)
-        return NextResponse.json({ error: error.message }, { status: 500 })
+        return NextResponse.json({ error: error.message || 'Server Error' }, { status: 500 })
     }
 }

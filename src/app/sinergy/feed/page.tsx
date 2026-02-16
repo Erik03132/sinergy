@@ -74,11 +74,19 @@ export default function NewsFeedPage() {
                 body: JSON.stringify({ idea: item })
             })
 
-            if (!res.ok) throw new Error('Failed to save')
+            if (!res.ok) {
+                const errorData = await res.json()
+                throw new Error(errorData.error || 'Failed to save')
+            }
 
-            toast.success("Новость сохранена в Архив!")
-        } catch (e) {
-            toast.error("Не удалось сохранить новость.")
+            const result = await res.json()
+            if (result.status === 'already_saved') {
+                toast.warning("Эта идея уже есть в Архиве")
+            } else {
+                toast.success("Новость сохранена в Архив!")
+            }
+        } catch (e: any) {
+            toast.error(`Ошибка: ${e.message}`)
             console.error(e)
         } finally {
             setArchivingId(null)
