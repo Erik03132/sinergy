@@ -223,7 +223,9 @@ export default function AnalysisPage() {
                         </div>
                     </div>
 
-                    <h2 className="text-3xl md:text-4xl font-bold leading-tight text-white">{idea.title}</h2>
+                    <h2 className="text-xl md:text-2xl font-bold leading-tight text-white tracking-tight text-justify">
+                        {idea.title}
+                    </h2>
                     <div className="space-y-4 max-w-3xl">
                         {idea.description.split('\n').filter(p => p.trim()).map((paragraph, i) => (
                             <p key={i} className="text-sm md:text-base text-neutral-400 leading-relaxed text-justify opacity-90">
