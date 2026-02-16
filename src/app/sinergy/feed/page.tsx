@@ -67,7 +67,7 @@ export default function NewsFeedPage() {
     }
 
     return (
-        <div className="p-8 max-w-5xl mx-auto w-full">
+        <div className="p-4 md:p-8 max-w-5xl mx-auto w-full">
             <div className="flex items-center justify-between mb-8">
                 <div className="flex items-center gap-3">
                     <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800">
@@ -100,7 +100,7 @@ export default function NewsFeedPage() {
             ) : (
                 <div className="space-y-4">
                     {news.map((item) => (
-                        <div key={item.id} className="bg-neutral-900/30 border border-neutral-800 p-6 rounded-2xl flex gap-6 hover:bg-neutral-900/50 transition-colors group">
+                        <div key={item.id} className="bg-neutral-900/30 border border-neutral-800 p-4 md:p-6 rounded-2xl flex flex-col md:flex-row gap-4 md:gap-6 hover:bg-neutral-900/50 transition-colors group">
                             <div className="flex-1 space-y-2">
                                 <div className="flex items-center gap-2 mb-1">
                                     <span className="text-[10px] uppercase font-bold text-emerald-500 bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-900">
@@ -118,7 +118,7 @@ export default function NewsFeedPage() {
                                 </p>
                             </div>
 
-                            <div className="flex flex-col gap-2 justify-center border-l border-neutral-800 pl-6">
+                            <div className="flex flex-row md:flex-col gap-2 justify-end md:justify-center border-t md:border-t-0 md:border-l border-neutral-800 pt-4 md:pt-0 md:pl-6">
                                 {item.original_url && item.original_url !== 'N/A' && (
                                     <a
                                         href={item.original_url}
