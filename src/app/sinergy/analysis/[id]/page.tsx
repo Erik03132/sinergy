@@ -224,7 +224,13 @@ export default function AnalysisPage() {
                     </div>
 
                     <h2 className="text-3xl md:text-4xl font-bold leading-tight text-white">{idea.title}</h2>
-                    <p className="text-lg text-neutral-400 leading-relaxed max-w-3xl">{idea.description}</p>
+                    <div className="space-y-4 max-w-3xl">
+                        {idea.description.split('\n').filter(p => p.trim()).map((paragraph, i) => (
+                            <p key={i} className="text-sm md:text-base text-neutral-400 leading-relaxed text-justify opacity-90">
+                                {paragraph}
+                            </p>
+                        ))}
+                    </div>
                 </section>
 
                 <div className="space-y-8 animate-in fade-in zoom-in-95 duration-500 delay-150">

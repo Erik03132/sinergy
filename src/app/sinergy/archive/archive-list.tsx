@@ -122,7 +122,7 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                             {idea.title}
                         </h3>
 
-                        <p className="text-sm text-neutral-400 line-clamp-3 mb-4 flex-1">
+                        <p className="text-[13px] text-neutral-400 line-clamp-4 mb-4 flex-1 leading-relaxed text-justify opacity-80">
                             {idea.description}
                         </p>
 
