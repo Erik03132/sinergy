@@ -118,14 +118,14 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                 {result.synergy_title || "Новая Возможность"}
             </h2>
 
-            <p className="text-sm text-neutral-300 mb-4 leading-relaxed relative z-10 min-h-[4.5rem]">
+            <p className="text-sm text-neutral-300 mb-4 leading-relaxed relative z-10">
                 {result.synergy_description || result.hypothesis}
             </p>
 
             <div className="flex-1 relative z-10 space-y-4">
                 <div>
                     <h3 className="text-xs uppercase font-bold text-neutral-600 mb-1">Логическая цепочка</h3>
-                    <p className="text-sm text-neutral-400 leading-relaxed line-clamp-[6]">
+                    <p className="text-sm text-neutral-400 leading-relaxed">
                         {result.logic_chain}
                     </p>
                 </div>
