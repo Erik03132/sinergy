@@ -1,9 +1,9 @@
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { NextResponse } from 'next/server'
 
 export async function POST(request: Request) {
     try {
-        const supabase = await createClient()
+        const supabase = createAdminClient()
         const { idea } = await request.json()
 
         if (!idea) {
