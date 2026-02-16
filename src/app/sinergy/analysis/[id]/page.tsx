@@ -111,6 +111,38 @@ export default function AnalysisPage() {
                     <h1 className="font-semibold text-lg truncate flex-1">{idea.title}</h1>
 
                     <div className="flex items-center gap-2">
+                        {/* Save to Archive Button - Only for Feed items */}
+                        {idea.source === 'perplexity' && (
+                            <button
+                                onClick={async () => {
+                                    try {
+                                        toast.info("Сохраняем в Архив...")
+                                        const res = await fetch('/api/sinergy/ideas/save', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ idea })
+                                        })
+
+                                        if (!res.ok) throw new Error('Failed to save')
+
+                                        const result = await res.json()
+                                        if (result.status === 'already_saved') {
+                                            toast.warning("Эта идея уже есть в Архиве")
+                                        } else {
+                                            toast.success("Сохранено в Архив!")
+                                            // Optionally redirect to the new archived version or just stay
+                                        }
+                                    } catch (e) {
+                                        toast.error("Не удалось сохранить")
+                                    }
+                                }}
+                                className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-950/50 transition-all text-xs font-medium cursor-pointer"
+                            >
+                                <Archive className="w-3.5 h-3.5" />
+                                В Архив
+                            </button>
+                        )}
+
                         <button
                             onClick={async () => {
                                 const newStatus = !idea.is_favorite
@@ -168,9 +200,7 @@ export default function AnalysisPage() {
                             title="Удалить навсегда"
                         >
                             <div className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-900/20 transition-colors">
-                                <Archive className="w-4 h-4" /> {/* Or trash icon, sticking to Archive component import but styled as trash for delete logic or just remove icon */}
-                                {/* Actually, let's use a clear Trash icon if available, or visually Distinct */}
-                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                                <Archive className="w-4 h-4" /> {/* Visual trash icon usage */}
                             </div>
                         </button>
                     </div>
