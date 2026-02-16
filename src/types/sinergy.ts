@@ -59,6 +59,8 @@ export interface SynergyResult {
   components?: [Idea, Idea];
   logic_chain?: string;
   hypothesis?: string;
+  synergy_title?: string; // New: Short punchy title
+  synergy_description?: string; // New: Detailed explanation
   debug_info?: string[];
 }
 

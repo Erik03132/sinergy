@@ -88,8 +88,8 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    title: `Синергия: ${result.components?.[0].title} + ${result.components?.[1].title}`,
-                    description: `${result.hypothesis}\n\nЛогика: ${result.logic_chain}`,
+                    title: result.synergy_title || `Синергия: ${result.components?.[0].title} + ${result.components?.[1].title}`,
+                    description: result.synergy_description || result.hypothesis || "",
                     is_favorite: true
                 }),
             })
@@ -114,9 +114,13 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                 ))}
             </div>
 
-            <h2 className="text-xl font-bold text-neutral-100 mb-4 leading-tight min-h-[3.5rem] relative z-10">
-                {result.hypothesis}
+            <h2 className="text-xl font-bold text-neutral-100 mb-2 leading-tight relative z-10">
+                {result.synergy_title || "Новая Возможность"}
             </h2>
+
+            <p className="text-sm text-neutral-300 mb-4 leading-relaxed relative z-10 min-h-[4.5rem]">
+                {result.synergy_description || result.hypothesis}
+            </p>
 
             <div className="flex-1 relative z-10 space-y-4">
                 <div>
