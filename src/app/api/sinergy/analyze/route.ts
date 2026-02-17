@@ -7,7 +7,7 @@ import { DetailedAnalysis } from '@/types/sinergy'
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()
-        const { ideaId, title, description } = body
+        const { ideaId, title, description, additionalContext } = body
 
         if (!ideaId || !title || !description) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -18,6 +18,7 @@ export async function POST(req: NextRequest) {
             
             Title: "${title}"
             Description: "${description}"
+            ${additionalContext ? `USER ADDITIONAL THOUGHTS/CONTEXT: "${additionalContext}"` : ''}
 
             Provide a detailed report in JSON format with the following structure:
             {

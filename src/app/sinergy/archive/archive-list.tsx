@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Idea } from '@/types/sinergy'
-import { Search, Tag, X, Filter, ArrowUpRight, Archive } from 'lucide-react'
+import { Search, Tag, X, Filter, ArrowUpRight, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -118,11 +118,11 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                             </span>
                         </div>
 
-                        <h3 className="font-semibold text-neutral-200 mb-2 group-hover:text-emerald-400 transition-colors line-clamp-2 text-justify">
+                        <h3 className="text-lg font-bold text-neutral-200 mb-2 group-hover:text-emerald-400 transition-colors line-clamp-2 text-justify">
                             {idea.title}
                         </h3>
 
-                        <p className="text-[13px] text-neutral-400 line-clamp-4 mb-4 flex-1 leading-relaxed text-justify opacity-80">
+                        <p className="text-sm text-neutral-400 line-clamp-4 mb-4 flex-1 leading-relaxed text-justify opacity-80">
                             {idea.description}
                         </p>
 
@@ -169,7 +169,7 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                                 className="p-2 text-neutral-500 bg-neutral-900 border border-neutral-800 hover:text-red-400 hover:border-red-500/30 rounded-lg transition-all hover:bg-red-950/10"
                                 title="Удалить"
                             >
-                                <Archive className="w-4 h-4" />
+                                <Trash2 className="w-4 h-4" />
                             </button>
                         </div>
                     </div>

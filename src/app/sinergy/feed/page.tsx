@@ -3,9 +3,10 @@
 
 import React, { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Newspaper, ExternalLink, Archive, RefreshCw, Loader2, FileText } from 'lucide-react'
+import { Newspaper, ExternalLink, Library, RefreshCw, Loader2, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
+import { cn } from '@/lib/utils'
 
 // We convert this to Client Component to handle Refresh state easily for this sprint
 // Or we keep it Server and use a Client Component Wrapper for the header/actions.
@@ -19,6 +20,7 @@ export default function NewsFeedPage() {
     const [news, setNews] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [lastUpdate, setLastUpdate] = useState<string | null>(null)
     const supabase = createClient()
     const router = useRouter()
 
@@ -28,6 +30,8 @@ export default function NewsFeedPage() {
 
     const fetchNews = async () => {
         setIsLoading(true)
+
+        // Fetch news
         const { data } = await supabase
             .from('ideas')
             .select('*')
@@ -37,12 +41,32 @@ export default function NewsFeedPage() {
             .limit(20)
 
         if (data) setNews(data)
+
+        // Fetch last successful cron run
+        const { data: logData } = await supabase
+            .from('cron_logs')
+            .select('created_at')
+            .eq('name', 'daily-feed')
+            .eq('status', 'success')
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+
+        if (logData) setLastUpdate(logData.created_at)
+
         setIsLoading(false)
     }
 
     React.useEffect(() => {
         fetchNews()
     }, [])
+
+    React.useEffect(() => {
+        if (news.length > 0) {
+            console.log('Feed data sample:', news[0])
+            console.log('Has original_url:', !!news[0].original_url, news[0].original_url)
+        }
+    }, [news])
 
     const handleForceRefresh = async () => {
         setIsRefreshing(true)
@@ -103,6 +127,11 @@ export default function NewsFeedPage() {
                     <div>
                         <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Лента Стартапов</h1>
                         <p className="text-xs md:text-sm text-neutral-500">Свежие идеи и кейсы до $100k</p>
+                        {lastUpdate && (
+                            <p className="text-[10px] text-emerald-500/70 mt-1">
+                                Последнее авто-обновление: {new Date(lastUpdate).toLocaleString('ru-RU')}
+                            </p>
+                        )}
                     </div>
                 </div>
 
@@ -147,32 +176,47 @@ export default function NewsFeedPage() {
                             </div>
 
                             <div className="flex flex-row md:flex-col gap-2 justify-end md:justify-center border-t md:border-t-0 md:border-l border-neutral-800 pt-4 md:pt-0 md:pl-6">
-                                {item.original_url && item.original_url !== 'N/A' && (
-                                    <a
-                                        href={item.original_url}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="p-2.5 text-sky-500 bg-sky-950/10 hover:bg-sky-950/30 rounded-xl transition-all flex items-center justify-center border border-sky-500/20 hover:border-sky-500/50"
-                                        title="Читать источник"
-                                    >
-                                        <ExternalLink className="w-5 h-5" />
-                                    </a>
-                                )}
+                                {/* External Link Button - Always visible for debug */}
+                                {(() => {
+                                    const rawUrl = item.original_url || item.metadata?.url || item.metadata?.original_url;
+                                    const hasUrl = rawUrl && rawUrl !== 'N/A' && rawUrl !== '';
+                                    const finalUrl = hasUrl ? (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`) : null;
+
+                                    return hasUrl ? (
+                                        <a
+                                            href={finalUrl!}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="p-2.5 text-yellow-400 bg-yellow-500/10 hover:bg-yellow-500/20 rounded-xl transition-all flex items-center justify-center border border-yellow-500/20 hover:border-yellow-500/50 shadow-sm shadow-yellow-900/20"
+                                            title="Читать источник"
+                                        >
+                                            <ExternalLink className="w-5 h-5" />
+                                        </a>
+                                    ) : (
+                                        <div
+                                            className="p-2.5 text-neutral-700 bg-neutral-900/50 border border-neutral-800 rounded-xl flex items-center justify-center opacity-30 cursor-not-allowed"
+                                            title="Источник не указан"
+                                        >
+                                            <ExternalLink className="w-5 h-5" />
+                                        </div>
+                                    )
+                                })()}
+
                                 <button
                                     onClick={() => handleArchive(item)}
                                     disabled={archivingId === item.id}
-                                    className="p-2.5 text-emerald-500 bg-emerald-950/10 hover:bg-emerald-950/30 rounded-xl transition-all flex items-center justify-center border border-emerald-500/20 hover:border-emerald-500/50 disabled:opacity-50"
+                                    className="p-2.5 text-emerald-500 bg-emerald-950/10 hover:bg-sky-950/30 rounded-xl transition-all flex items-center justify-center border border-emerald-500/20 hover:border-emerald-500/50 disabled:opacity-50"
                                     title="В Архив"
                                 >
                                     {archivingId === item.id ? (
                                         <Loader2 className="w-5 h-5 animate-spin" />
                                     ) : (
-                                        <Archive className="w-5 h-5" />
+                                        <Library className="w-5 h-5" />
                                     )}
                                 </button>
                                 <button
                                     onClick={() => handleDetailsClick(item.id)}
-                                    className="p-2.5 text-violet-400 bg-violet-950/10 hover:bg-violet-950/30 rounded-xl transition-all flex items-center justify-center border border-violet-500/20 hover:border-violet-500/50"
+                                    className="p-2.5 text-violet-400 bg-violet-950/10 hover:bg-violet-900/30 rounded-xl transition-all flex items-center justify-center border border-violet-500/20 hover:border-violet-500/50"
                                     title="Подробный анализ"
                                 >
                                     <FileText className="w-5 h-5" />

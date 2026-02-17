@@ -100,17 +100,17 @@ export default function FindSynergyPage() {
             {/* Main Search UI */}
             {!result && !isLoading && (
                 <div className="text-center space-y-6">
-                    <h1 className="text-4xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
-                        Discover Startup Synergies
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
+                        Синергия Стартапов
                     </h1>
-                    <p className="text-neutral-400 max-w-lg mx-auto text-lg">
-                        Our AI engine analyzes your idea archive to find hidden combinations with high market potential.
+                    <p className="text-neutral-400 max-w-lg mx-auto text-lg text-justify">
+                        Наш ИИ-движок анализирует ваш архив идей, чтобы найти скрытые комбинации с высоким рыночным потенциалом.
                     </p>
                     <button
                         onClick={findNextSynergy}
                         className="group relative inline-flex h-12 items-center justify-center overflow-hidden rounded-full bg-neutral-950 px-8 font-medium text-neutral-200 transition-all duration-300 hover:bg-neutral-800 hover:text-white border border-neutral-800 hover:border-emerald-500/50"
                     >
-                        <span className="mr-2">Find Synergy</span>
+                        <span className="mr-2">Найти Синергию</span>
                         <Sparkles className="w-4 h-4 group-hover:text-emerald-400 transition-colors" />
                         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                     </button>
@@ -120,7 +120,7 @@ export default function FindSynergyPage() {
             {isLoading && (
                 <div className="flex flex-col items-center gap-4 animate-pulse">
                     <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
-                    <p className="text-neutral-400 font-medium">Analyzing vertical compatibility...</p>
+                    <p className="text-neutral-400 font-medium">Анализируем совместимость...</p>
                 </div>
             )}
 
@@ -156,10 +156,10 @@ export default function FindSynergyPage() {
 
                         <div className="space-y-6 relative z-10">
                             <div>
-                                <h3 className="text-xs font-semibold uppercase tracking-wider text-emerald-500 mb-2">
-                                    Logic Chain
+                                <h3 className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 mb-2">
+                                    Логическая цепочка
                                 </h3>
-                                <p className="text-neutral-300 leading-relaxed">
+                                <p className="text-sm text-neutral-300 leading-relaxed text-justify opacity-90">
                                     {result.logic_chain}
                                 </p>
                             </div>
@@ -167,10 +167,10 @@ export default function FindSynergyPage() {
                             <div className="w-full h-px bg-neutral-800" />
 
                             <div>
-                                <h3 className="text-xs font-semibold uppercase tracking-wider text-cyan-500 mb-2">
-                                    Product Hypothesis
+                                <h3 className="text-[10px] font-bold uppercase tracking-wider text-cyan-500 mb-2">
+                                    Гипотеза Продукта
                                 </h3>
-                                <p className="text-xl font-medium text-neutral-100 leading-relaxed">
+                                <p className="text-base font-bold text-neutral-100 leading-relaxed text-justify">
                                     {result.hypothesis}
                                 </p>
                             </div>

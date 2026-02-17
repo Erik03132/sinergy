@@ -37,8 +37,8 @@ export default function BlenderPage() {
         <div className="flex flex-col h-full">
             <div className="p-8 pb-4 flex justify-between items-end border-b border-neutral-800 bg-neutral-950/80 backdrop-blur-xl sticky top-0 z-20">
                 <div>
-                    <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-3">
-                        <Shuffle className="w-8 h-8 text-purple-500" />
+                    <h1 className="text-2xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-3">
+                        <Shuffle className="w-6 h-6 text-purple-500" />
                         Блендер Идей
                     </h1>
                     <p className="text-neutral-500 mt-1">Генератор гипотез на базе ИИ</p>
@@ -118,14 +118,14 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                 {result.synergy_title || "Новая Возможность"}
             </h2>
 
-            <p className="text-sm text-neutral-300 mb-4 leading-relaxed relative z-10">
+            <p className="text-sm text-neutral-300 mb-4 leading-relaxed relative z-10 text-justify">
                 {result.synergy_description || result.hypothesis}
             </p>
 
             <div className="flex-1 relative z-10 space-y-4">
                 <div>
                     <h3 className="text-xs uppercase font-bold text-neutral-600 mb-1">Логическая цепочка</h3>
-                    <p className="text-sm text-neutral-400 leading-relaxed">
+                    <p className="text-sm text-neutral-400 leading-relaxed text-justify">
                         {result.logic_chain}
                     </p>
                 </div>

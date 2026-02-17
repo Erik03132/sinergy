@@ -40,7 +40,7 @@ export default function AddIdeaPage() {
 
     return (
         <div className="container mx-auto max-w-2xl py-12 px-4">
-            <h1 className="text-3xl font-bold mb-8 text-neutral-200">Добавить Идею</h1>
+            <h1 className="text-2xl font-bold mb-8 text-neutral-200">Добавить Идею</h1>
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">

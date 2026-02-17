@@ -1,5 +1,5 @@
 
-import { Newspaper, PlusCircle, Shuffle, Heart, Archive } from 'lucide-react'
+import { Newspaper, PlusCircle, Shuffle, Heart, Library } from 'lucide-react'
 
 export const SINERGY_NAV_ITEMS = [
     {
@@ -29,7 +29,7 @@ export const SINERGY_NAV_ITEMS = [
     {
         name: 'Архив',
         href: '/sinergy/archive',
-        icon: Archive,
+        icon: Library,
         description: 'Вся коллекция'
     }
 ]

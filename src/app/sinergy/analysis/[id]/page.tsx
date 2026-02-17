@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Idea, DetailedAnalysis } from '@/types/sinergy'
-import { Loader2, ArrowLeft, Target, TrendingUp, ShieldAlert, Map, Swords, BarChart3, Receipt, Archive, Globe } from 'lucide-react'
+import { Loader2, ArrowLeft, Target, TrendingUp, ShieldAlert, Map, Swords, BarChart3, Receipt, Library, Trash2, Globe, RefreshCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +18,7 @@ export default function AnalysisPage() {
     const [analysis, setAnalysis] = useState<DetailedAnalysis | null>(null)
     const [isLoading, setIsLoading] = useState(true)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
+    const [userThoughts, setUserThoughts] = useState('')
 
     useEffect(() => {
         const fetchIdea = async () => {
@@ -41,6 +42,9 @@ export default function AnalysisPage() {
             // Check if analysis already exists in metadata
             if (data.metadata?.analysis) {
                 setAnalysis(data.metadata.analysis)
+                if (data.metadata?.user_refinement) {
+                    setUserThoughts(data.metadata.user_refinement)
+                }
                 setIsLoading(false)
             } else {
                 // If not, trigger analysis automatically
@@ -52,7 +56,7 @@ export default function AnalysisPage() {
         fetchIdea()
     }, [id, router])
 
-    const triggerAnalysis = async (ideaData: Idea) => {
+    const triggerAnalysis = async (ideaData: Idea, additionalContext?: string) => {
         setIsAnalyzing(true)
         try {
             const res = await fetch('/api/sinergy/analyze', {
@@ -61,7 +65,8 @@ export default function AnalysisPage() {
                 body: JSON.stringify({
                     ideaId: ideaData.id,
                     title: ideaData.title,
-                    description: ideaData.description
+                    description: ideaData.description,
+                    additionalContext: additionalContext
                 })
             })
 
@@ -69,7 +74,23 @@ export default function AnalysisPage() {
 
             const data: DetailedAnalysis = await res.json()
             setAnalysis(data)
-            toast.success('Анализ завершен!')
+
+            // Update local idea metadata if context was added
+            if (additionalContext) {
+                const supabase = createClient()
+                const updatedMetadata = {
+                    ...(ideaData.metadata || {}),
+                    user_refinement: additionalContext
+                }
+                await supabase
+                    .from('ideas')
+                    .update({ metadata: updatedMetadata })
+                    .eq('id', ideaData.id)
+
+                setIdea({ ...ideaData, metadata: updatedMetadata })
+            }
+
+            toast.success(additionalContext ? 'Анализ обновлен!' : 'Анализ завершен!')
         } catch (error) {
             console.error(error)
             toast.error('Не удалось сгенерировать анализ. Попробуйте позже.')
@@ -139,7 +160,7 @@ export default function AnalysisPage() {
                                 }}
                                 className="flex items-center gap-1.5 px-2 py-1.5 rounded-full border border-emerald-500/30 bg-emerald-950/30 text-emerald-400 hover:bg-emerald-950/50 transition-all text-[10px] md:text-xs font-medium cursor-pointer shrink-0"
                             >
-                                <Archive className="w-3 h-3 md:w-3.5 md:h-3.5" />
+                                <Library className="w-3 h-3 md:w-3.5 md:h-3.5" />
                                 <span className="hidden xs:inline">Архив</span>
                             </button>
                         )}
@@ -201,7 +222,7 @@ export default function AnalysisPage() {
                             title="Удалить навсегда"
                         >
                             <div className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-red-900/20 transition-colors">
-                                <Archive className="w-4 h-4" /> {/* Visual trash icon usage */}
+                                <Trash2 className="w-4 h-4" /> {/* Visual trash icon usage */}
                             </div>
                         </button>
                     </div>
@@ -232,6 +253,55 @@ export default function AnalysisPage() {
                                 {paragraph}
                             </p>
                         ))}
+                    </div>
+                </section>
+
+                {/* Interactive Refinement Block */}
+                <section className="animate-in fade-in slide-in-from-bottom-6 duration-500 delay-100">
+                    <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 md:p-6 overflow-hidden relative group">
+                        <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+                            <RefreshCcw className="w-24 h-24 text-white" />
+                        </div>
+
+                        <div className="relative z-10 space-y-4">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                                    <RefreshCcw className="w-4 h-4 text-amber-500" />
+                                </div>
+                                <div>
+                                    <h3 className="text-sm font-bold text-neutral-200">Дополнить идею</h3>
+                                    <p className="text-[10px] text-neutral-500">Ваши мысли изменят вектор анализа ИИ</p>
+                                </div>
+                            </div>
+
+                            <div className="relative">
+                                <textarea
+                                    value={userThoughts}
+                                    onChange={(e) => setUserThoughts(e.target.value)}
+                                    placeholder="Напишите здесь свои соображения, фичи или особенности рынка..."
+                                    className="w-full bg-black/40 border border-neutral-800 rounded-xl px-4 py-3 text-sm text-neutral-200 placeholder:text-neutral-600 focus:outline-none focus:ring-1 focus:ring-amber-500/50 transition-all resize-none min-h-[100px]"
+                                />
+
+                                <button
+                                    onClick={() => triggerAnalysis(idea, userThoughts)}
+                                    disabled={isAnalyzing || !userThoughts.trim()}
+                                    className="absolute bottom-3 right-3 p-2.5 bg-amber-500 text-black rounded-xl hover:bg-amber-400 transition-all active:scale-95 disabled:bg-neutral-800 disabled:text-neutral-500 disabled:cursor-not-allowed group"
+                                    title="Пересчитать анализ"
+                                >
+                                    {isAnalyzing ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <RefreshCcw className="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" />
+                                    )}
+                                </button>
+                            </div>
+
+                            {idea.metadata?.user_refinement && !isAnalyzing && (
+                                <div className="p-3 bg-emerald-500/5 border border-emerald-500/10 rounded-lg">
+                                    <p className="text-[10px] text-emerald-500/60 font-medium">Текущий анализ уже учитывает ваши вводные</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </section>
 
@@ -270,7 +340,7 @@ export default function AnalysisPage() {
                                     <TrendingUp className="w-5 h-5 text-blue-500" />
                                     Динамика Рынка
                                 </h3>
-                                <p className="text-neutral-300 leading-relaxed text-sm md:text-base">
+                                <p className="text-neutral-300 leading-relaxed text-sm md:text-base max-w-3xl">
                                     {analysis.market.description}
                                 </p>
                             </div>
@@ -353,7 +423,7 @@ export default function AnalysisPage() {
                                                         <span className="text-green-500 font-bold shrink-0">+</span>
                                                         <span className="text-neutral-400">{comp.strength}</span>
                                                     </div>
-                                                    <div className="text-xs leading-relaxed flex gap-2 text-justify">
+                                                    <div className="text-xs leading-relaxed flex gap-2">
                                                         <span className="text-red-500 font-bold shrink-0">-</span>
                                                         <span className="text-neutral-400">{comp.weakness}</span>
                                                     </div>
@@ -383,8 +453,7 @@ function StatCard({ label, value, sub, icon }: { label: string, value: string, s
                     {icon} {label}
                 </div>
             </div>
-            {/* Justified text in stat card for long content */}
-            <div className="text-sm text-neutral-300 leading-relaxed font-normal break-words text-justify">
+            <div className="text-sm text-neutral-300 leading-relaxed font-normal break-words">
                 {value}
             </div>
             {sub && <div className="text-[10px] text-neutral-600">{sub}</div>}

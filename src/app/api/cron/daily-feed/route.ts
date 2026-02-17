@@ -80,10 +80,30 @@ export async function GET(req: Request) {
             if (error) throw error
         }
 
+        // Log success
+        await supabase.from('cron_logs').insert({
+            name: 'daily-feed',
+            status: 'success',
+            item_count: finalInserts.length
+        })
+
         return NextResponse.json({ success: true, count: finalInserts.length })
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Cron Error:', error)
+
+        // Log error to DB if possible
+        try {
+            const supabase = await createClient()
+            await supabase.from('cron_logs').insert({
+                name: 'daily-feed',
+                status: 'error',
+                message: error.message || 'Unknown error'
+            })
+        } catch (logError) {
+            console.error('Failed to log cron error:', logError)
+        }
+
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
     }
 }

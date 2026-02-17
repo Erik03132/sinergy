@@ -1,7 +1,7 @@
 
 'use client'
 
-import { Archive } from 'lucide-react'
+import { Library } from 'lucide-react'
 import { toast } from 'sonner'
 import { useState } from 'react'
 
@@ -34,7 +34,7 @@ export function ArchiveButton({ idea }: { idea: any }) {
                 }`}
             title="В Архив"
         >
-            <Archive className="w-5 h-5" />
+            <Library className="w-5 h-5" />
         </button>
     )
 }

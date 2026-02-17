@@ -40,7 +40,7 @@ export default function MyIdeasPage() {
 
     return (
         <div className="container mx-auto max-w-2xl py-12 px-4">
-            <h1 className="text-3xl font-bold mb-8 text-neutral-100">My Startup Ideas</h1>
+            <h1 className="text-2xl font-bold mb-8 text-neutral-100">My Startup Ideas</h1>
 
             <form onSubmit={handleSubmit} className="space-y-6 bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 backdrop-blur-sm">
                 <div className="space-y-2">

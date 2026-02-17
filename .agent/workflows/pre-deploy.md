@@ -10,10 +10,10 @@ description: Validates the project (Lint, Typecheck, Build) before pushing to Gi
    rm -rf .next
    ```
 
-2. **Type Check & Lint**
-   - Runs TypeScript validation and ESLint to catch code errors.
+2. **Type Check & Lint + Cron Health**
+   - Проверяет TypeScript, ошибки стиля и работоспособность кронов.
    ```bash
-   npm run lint
+   npm run lint && node scripts/check-cron-health.mjs
    ```
 
 3. **Production Build Simulation**
