@@ -13,6 +13,21 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
         }
 
+        const supabase = await createClient()
+
+        // 1. Server-side Cache Check
+        // If we already have an analysis and NO additional context (refinement), return it directly
+        const { data: existingIdea } = await supabase
+            .from('ideas')
+            .select('metadata')
+            .eq('id', ideaId)
+            .single()
+
+        if (existingIdea?.metadata?.analysis && !additionalContext) {
+            console.log(`📦 Returning cached analysis for idea ${ideaId}`)
+            return NextResponse.json(existingIdea.metadata.analysis)
+        }
+
         const prompt = `
             You are a Senior Startup Analyst. Conduct a deep analysis of this product idea:
             
@@ -79,17 +94,7 @@ export async function POST(req: NextRequest) {
             ...analysisData
         }
 
-        // Save to Supabase (in metadata or analysis column if it exists, or just in metadata)
-        const supabase = await createClient()
-
-        // We'll store it in a 'metadata' jsonb column for now, under 'analysis' key
-        // First fetch existing metadata
-        const { data: existingIdea } = await supabase
-            .from('ideas')
-            .select('metadata')
-            .eq('id', ideaId)
-            .single()
-
+        // 3. Save to Supabase (only if updated or new)
         const updatedMetadata = {
             ...(existingIdea?.metadata || {}),
             analysis: analysisWithStatus
@@ -102,7 +107,6 @@ export async function POST(req: NextRequest) {
 
         if (updateError) {
             console.error('Failed to save analysis to DB:', updateError)
-            // We still return the data to the frontend so the user sees it
         }
 
         return NextResponse.json(analysisWithStatus)
