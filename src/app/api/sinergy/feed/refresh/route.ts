@@ -1,5 +1,5 @@
 
-import { askPerplexity } from '@/lib/ai/perplexity'
+import { askGemini } from '@/lib/ai/gemini'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { isSimilar } from '@/lib/utils/string-similarity'
@@ -7,14 +7,14 @@ import { isSimilar } from '@/lib/utils/string-similarity'
 // Shared logic for fetching feed (used by Cron and Manual Trigger)
 async function fetchAndStoreFeed() {
     const prompt = `
-        Find 10 DISTINCT, NEW (last 24-48 hours) startup ideas, micro-SaaS projects, or business case studies with a budget under $100k.
-        Search sources like IndieHackers, ProductHunt, Reddit (r/SaaS, r/Entrepreneur), Twitter, and TechCrunch.
+        Search the web for 10 DISTINCT, NEW (last 24-48 hours) startup ideas, micro-SaaS projects, or business case studies with a budget under $100k.
+        Look for announcements on ProductHunt, IndieHackers, and Reddit (r/SaaS).
 
         Format the output as a JSON Array of objects with these fields:
         - title: Catchy title (Russian)
         - summary: 2-3 sentences description (Russian)
         - source: Source name (e.g. "Product Hunt")
-        - url: URL to source (MANDATORY)
+        - url: URL to source (MANDATORY, must be real)
         - budget: Estimated budget string (e.g. "$500", "$10k")
 
         IMPORTANT: 
@@ -23,10 +23,7 @@ async function fetchAndStoreFeed() {
         3. REAL URLs are CRITICAL.
     `
 
-    const responseRaw = await askPerplexity([
-        { role: 'system', content: 'You are a professional startup researcher. You always provide real URLs from recent sources.' },
-        { role: 'user', content: prompt }
-    ])
+    const responseRaw = await askGemini(prompt, { search: true })
 
     let newsItems = []
     // Strict JSON cleanup

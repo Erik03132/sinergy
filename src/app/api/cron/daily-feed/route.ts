@@ -1,5 +1,5 @@
 
-import { askPerplexity } from '@/lib/ai/perplexity'
+import { askGemini } from '@/lib/ai/gemini'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -11,8 +11,8 @@ export async function GET(req: Request) {
 
     try {
         const prompt = `
-            Find 10 DISTINCT, NEW (last 24-48 hours) startup ideas, micro-SaaS projects, or business case studies with a budget under $100k.
-            Search sources like IndieHackers, ProductHunt, Reddit (r/SaaS, r/Entrepreneur), Twitter, and TechCrunch.
+            Search the web for 10 DISTINCT, NEW (last 24-48 hours) startup ideas, micro-SaaS projects, or business case studies with a budget under $100k.
+            Search ProductHunt, IndieHackers, and Reddit (r/SaaS).
 
             Format the output as a JSON Array of objects with these fields:
             - title: Catchy title (Russian)
@@ -24,13 +24,10 @@ export async function GET(req: Request) {
             IMPORTANT: 
             1. Output ONLY valid JSON array.
             2. ALL TEXT (title, summary) MUST BE IN RUSSIAN.
-            3. REAL URLs ARE CRITICAL for reporting.
+            3. REAL URLs ARE CRITICAL.
         `
 
-        const responseRaw = await askPerplexity([
-            { role: 'system', content: 'You are a professional discovery engine.' },
-            { role: 'user', content: prompt }
-        ])
+        const responseRaw = await askGemini(prompt, { search: true })
 
         let newsItems = []
         // Strict JSON cleanup

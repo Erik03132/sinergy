@@ -18,23 +18,28 @@ interface GeminiResponse {
 }
 
 const MODELS = [
-    'gemini-2.5-pro',
-    'gemini-2.0-flash',
+    'gemini-2.0-flash', // Flash is faster and supports search better
     'gemini-2.0-flash-lite',
-    'openrouter', // OpenRouter acts as a massive fallback aggregator
+    'openrouter',
     'moonshot',
     'deepseek'
 ]
 
-async function fetchGemini(model: string, apiKey: string, prompt: string) {
+async function fetchGemini(model: string, apiKey: string, prompt: string, search: boolean = false) {
+    const body: any = {
+        contents: [{ role: 'user' as const, parts: [{ text: prompt }] }],
+    }
+
+    if (search && model.startsWith('gemini')) {
+        body.tools = [{ google_search_retrieval: {} }]
+    }
+
     const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
         {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ role: 'user' as const, parts: [{ text: prompt }] }] satisfies GeminiMessage[],
-            }),
+            body: JSON.stringify(body),
         }
     )
     return response
@@ -42,18 +47,19 @@ async function fetchGemini(model: string, apiKey: string, prompt: string) {
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
-export async function askGemini(prompt: string): Promise<string> {
+export async function askGemini(prompt: string, options: { search?: boolean } = {}): Promise<string> {
     const geminiKey = process.env.GEMINI_API_KEY
+    const { search = false } = options
 
     // We try models in sequence
     for (const model of MODELS) {
         try {
-            console.log(`🤖 Asking AI (${model})...`)
+            console.log(`🤖 Asking AI (${model})${search ? ' with search' : ''}...`)
 
             // Handle Gemini Models
             if (model.startsWith('gemini')) {
                 if (!geminiKey) continue
-                const response = await fetchGemini(model, geminiKey, prompt)
+                const response = await fetchGemini(model, geminiKey, prompt, search)
 
                 if (response.ok) {
                     const data: GeminiResponse = await response.json()
