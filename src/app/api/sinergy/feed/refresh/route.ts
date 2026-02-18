@@ -1,5 +1,5 @@
 
-import { askGemini } from '@/lib/ai/gemini'
+import { askPerplexity } from '@/lib/ai/perplexity'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { isSimilar } from '@/lib/utils/string-similarity'
@@ -14,15 +14,19 @@ async function fetchAndStoreFeed() {
         - title: Catchy title (Russian)
         - summary: 2-3 sentences description (Russian)
         - source: Source name (e.g. "Product Hunt")
-        - url: URL to source (or 'N/A')
+        - url: URL to source (MANDATORY)
         - budget: Estimated budget string (e.g. "$500", "$10k")
 
         IMPORTANT: 
         1. Output ONLY valid JSON array.
         2. ALL TEXT (title, summary) MUST BE IN RUSSIAN.
+        3. REAL URLs are CRITICAL.
     `
 
-    const responseRaw = await askGemini(prompt)
+    const responseRaw = await askPerplexity([
+        { role: 'system', content: 'You are a professional startup researcher. You always provide real URLs from recent sources.' },
+        { role: 'user', content: prompt }
+    ])
 
     let newsItems = []
     // Strict JSON cleanup

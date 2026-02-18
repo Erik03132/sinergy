@@ -1,5 +1,5 @@
 
-import { askGemini } from '@/lib/ai/gemini'
+import { askPerplexity } from '@/lib/ai/perplexity'
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
@@ -18,22 +18,26 @@ export async function GET(req: Request) {
             - title: Catchy title (Russian)
             - summary: 2-3 sentences description (Russian)
             - source: Source name (e.g. "Product Hunt")
-            - url: URL to source (or 'N/A')
+            - url: URL to source (MANDATORY)
             - budget: Estimated budget string (e.g. "$500", "$10k")
 
             IMPORTANT: 
             1. Output ONLY valid JSON array.
             2. ALL TEXT (title, summary) MUST BE IN RUSSIAN.
+            3. REAL URLs ARE CRITICAL for reporting.
         `
 
-        const responseRaw = await askGemini(prompt)
+        const responseRaw = await askPerplexity([
+            { role: 'system', content: 'You are a professional discovery engine.' },
+            { role: 'user', content: prompt }
+        ])
 
         let newsItems = []
         // Strict JSON cleanup
         const clean = responseRaw.replace(/```json/g, '').replace(/```/g, '').trim()
 
         // Attempt to extract JSON array if mixed with text
-        const jsonMatch = clean.match(/\[.*\]/s)
+        const jsonMatch = clean.match(/\[[\s\S]*\]/)
         const jsonString = jsonMatch ? jsonMatch[0] : clean
 
         try {
