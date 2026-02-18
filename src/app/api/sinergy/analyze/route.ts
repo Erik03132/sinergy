@@ -4,6 +4,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextRequest, NextResponse } from 'next/server'
 import { DetailedAnalysis } from '@/types/sinergy'
 
+export const runtime = 'edge'
+
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json()

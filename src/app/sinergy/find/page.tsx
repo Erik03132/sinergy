@@ -103,7 +103,7 @@ export default function FindSynergyPage() {
                     <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                         Синергия Стартапов
                     </h1>
-                    <p className="text-neutral-400 max-w-lg mx-auto text-lg text-justify">
+                    <p className="text-neutral-400 max-w-lg mx-auto text-lg text-center leading-relaxed opacity-80 px-4">
                         Наш ИИ-движок анализирует ваш архив идей, чтобы найти скрытые комбинации с высоким рыночным потенциалом.
                     </p>
                     <button
@@ -159,7 +159,7 @@ export default function FindSynergyPage() {
                                 <h3 className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 mb-2">
                                     Логическая цепочка
                                 </h3>
-                                <p className="text-sm text-neutral-300 leading-relaxed text-justify opacity-90">
+                                <p className="text-sm text-neutral-300 leading-relaxed text-center opacity-80 px-6 italic">
                                     {result.logic_chain}
                                 </p>
                             </div>
@@ -170,7 +170,7 @@ export default function FindSynergyPage() {
                                 <h3 className="text-[10px] font-bold uppercase tracking-wider text-cyan-500 mb-2">
                                     Гипотеза Продукта
                                 </h3>
-                                <p className="text-base font-bold text-neutral-100 leading-relaxed text-justify">
+                                <p className="text-lg md:text-xl font-black text-neutral-100 leading-tight text-center tracking-tight uppercase">
                                     {result.hypothesis}
                                 </p>
                             </div>
@@ -318,8 +318,8 @@ function IdeaCard({ idea }: { idea: any }) {
                     {idea.vertical}
                 </span>
             </div>
-            <h3 className="font-semibold text-neutral-200">{idea.title}</h3>
-            <p className="text-sm text-neutral-400 line-clamp-3 flex-grow">
+            <h3 className="font-bold text-neutral-200 text-center tracking-tight leading-tight">{idea.title}</h3>
+            <p className="text-xs text-neutral-400 line-clamp-3 flex-grow text-center opacity-70">
                 {idea.description}
             </p>
             <div className="flex flex-wrap gap-1 pt-2">

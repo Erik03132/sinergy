@@ -167,10 +167,10 @@ export default function NewsFeedPage() {
                                         {new Date(item.created_at).toLocaleDateString()}
                                     </span>
                                 </div>
-                                <h3 className="text-lg md:text-xl font-semibold text-neutral-200 group-hover:text-emerald-400 transition-colors text-justify">
+                                <h3 className="text-lg md:text-xl font-bold text-neutral-100 group-hover:text-emerald-400 transition-colors text-left leading-tight tracking-tight px-4">
                                     {item.title}
                                 </h3>
-                                <p className="text-neutral-400 leading-relaxed text-sm text-justify">
+                                <p className="text-neutral-400 leading-relaxed text-sm md:text-base text-left opacity-80 px-4">
                                     {item.description}
                                 </p>
                             </div>

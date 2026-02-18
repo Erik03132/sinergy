@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { Idea } from '@/types/sinergy'
-import { Search, Tag, X, Filter, ArrowUpRight, Trash2 } from 'lucide-react'
+import { Search, Tag, X, Filter, ArrowUpRight, Trash2, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -118,11 +118,11 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                             </span>
                         </div>
 
-                        <h3 className="text-base font-semibold text-neutral-200 mb-2 group-hover:text-emerald-400 transition-colors text-justify">
+                        <h3 className="text-base font-bold text-neutral-100 mb-2 group-hover:text-emerald-400 transition-colors text-left tracking-tight leading-tight px-2">
                             {idea.title}
                         </h3>
 
-                        <p className="text-sm text-neutral-400 line-clamp-4 mb-4 flex-1 leading-relaxed text-justify opacity-80">
+                        <p className="text-sm text-neutral-400 line-clamp-4 mb-4 flex-1 leading-relaxed text-left opacity-80 px-2">
                             {idea.description}
                         </p>
 
@@ -150,18 +150,9 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
                                 )}
                                 title={idea.is_favorite ? "Убрать из избранного" : "В избранное"}
                             >
-                                <svg
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    viewBox="0 0 24 24"
-                                    fill={idea.is_favorite ? "currentColor" : "none"}
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                    className="w-4 h-4"
-                                >
-                                    <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-                                </svg>
+                                <Heart
+                                    className={cn("w-4 h-4", idea.is_favorite && "fill-current")}
+                                />
                             </button>
 
                             <button

@@ -19,6 +19,7 @@ export default function AnalysisPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [userThoughts, setUserThoughts] = useState('')
+    const [hasInitializedThoughts, setHasInitializedThoughts] = useState(false)
     const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
@@ -43,8 +44,9 @@ export default function AnalysisPage() {
             // Check if analysis already exists in metadata
             if (data.metadata?.analysis) {
                 setAnalysis(data.metadata.analysis)
-                if (data.metadata?.user_refinement) {
+                if (data.metadata?.user_refinement && !hasInitializedThoughts) {
                     setUserThoughts(data.metadata.user_refinement)
+                    setHasInitializedThoughts(true)
                 }
                 setIsLoading(false)
             } else {
@@ -93,6 +95,8 @@ export default function AnalysisPage() {
             }
 
             toast.success(additionalContext ? 'Анализ обновлен!' : 'Анализ завершен!')
+            setUserThoughts('') // Clear input after success
+            setHasInitializedThoughts(true) // Mark as initialized so metadata update doesn't restore it
         } catch (error) {
             console.error(error)
             setError('Не удалось сгенерировать анализ. Попробуйте нажать кнопку повтора.')
@@ -276,15 +280,17 @@ export default function AnalysisPage() {
                         </div>
                     </div>
 
-                    <h2 className="text-base md:text-lg font-bold leading-tight text-white tracking-tight text-justify">
-                        {idea.title}
-                    </h2>
-                    <div className="space-y-4 max-w-3xl">
-                        {idea.description.split('\n').filter(p => p.trim()).map((paragraph, i) => (
-                            <p key={i} className="text-sm md:text-base text-neutral-400 leading-relaxed text-justify opacity-90 break-words">
-                                {paragraph}
-                            </p>
-                        ))}
+                    <div className="flex flex-col items-start text-left space-y-4 max-w-4xl mx-auto">
+                        <h2 className="text-xl md:text-2xl font-black leading-tight text-white tracking-tight uppercase text-left w-full">
+                            {idea.title}
+                        </h2>
+                        <div className="space-y-4 w-full">
+                            {idea.description.split('\n').filter(p => p.trim()).map((paragraph, i) => (
+                                <p key={i} className="text-sm md:text-base text-neutral-400 leading-relaxed text-left opacity-80 break-words max-w-2xl">
+                                    {paragraph}
+                                </p>
+                            ))}
+                        </div>
                     </div>
                 </section>
 
@@ -367,12 +373,12 @@ export default function AnalysisPage() {
                         <div className="lg:col-span-2 space-y-6">
 
                             {/* Market Dynamics */}
-                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 hover:border-blue-500/20 transition-colors text-justify">
-                                <h3 className="text-base font-bold mb-4 flex items-center gap-2 text-neutral-200">
-                                    <TrendingUp className="w-5 h-5 text-blue-500" />
+                            <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 hover:border-blue-500/20 transition-colors text-left">
+                                <h3 className="text-base font-bold mb-4 flex items-center justify-start gap-2 text-neutral-200 uppercase tracking-widest text-[10px]">
+                                    <TrendingUp className="w-4 h-4 text-blue-500" />
                                     Динамика Рынка
                                 </h3>
-                                <p className="text-neutral-300 leading-relaxed text-sm md:text-base max-w-3xl">
+                                <p className="text-neutral-300 leading-relaxed text-sm md:text-base max-w-2xl opacity-90">
                                     {analysis.market.description}
                                 </p>
                             </div>
@@ -397,8 +403,8 @@ export default function AnalysisPage() {
                                             </div>
                                             <ul className="space-y-2">
                                                 {phase.steps.map((step, sIdx) => (
-                                                    <li key={sIdx} className="text-neutral-400 text-sm flex items-start gap-3 group text-justify">
-                                                        <div className="w-1.5 h-1.5 rounded-full bg-neutral-700 mt-1.5 shrink-0 group-hover:bg-cyan-500 transition-colors" />
+                                                    <li key={sIdx} className="text-neutral-400 text-sm flex items-center justify-start gap-3 group text-left">
+                                                        <div className="w-1 h-1 rounded-full bg-neutral-700 shrink-0 group-hover:bg-cyan-500 transition-colors" />
                                                         {step}
                                                     </li>
                                                 ))}

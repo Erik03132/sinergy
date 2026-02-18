@@ -59,8 +59,38 @@ export interface SynergyResult {
   components?: [Idea, Idea];
   logic_chain?: string;
   hypothesis?: string;
-  synergy_title?: string; // New: Short punchy title
-  synergy_description?: string; // New: Detailed explanation
+  synergy_title?: string;
+  synergy_description?: string;
+  mode?: string;
+  thinking_models?: {
+    medici_effect: string;
+    scamper: string;
+    analogy_bridge: string;
+    inversion: string;
+    blue_ocean_errc?: string;
+    knowledge_transfer?: string;
+    jobs_to_be_done?: string;
+  };
+  mvp_scenario?: string;
+  defensibility?: {
+    competitive_moat: string;
+    unfair_advantage: string;
+  };
+  anti_pattern_check?: string;
+  scores?: {
+    total: number;
+    blue_ocean: number;
+    knowledge_transfer: number;
+  };
+  contrarian_bet?: string;
+  blue_ocean_wedge?: string;
+  anti_generic_guard?: string;
+  classification?: {
+    vertical: string;
+    core_tech: string[];
+    target_audience: string;
+    business_model: string;
+  };
   debug_info?: string[];
 }
 
