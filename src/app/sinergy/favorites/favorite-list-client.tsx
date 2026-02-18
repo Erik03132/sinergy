@@ -93,7 +93,7 @@ export function FavoriteListClient({ initialIdeas }: { initialIdeas: Idea[] | nu
                         </div>
                     </div>
 
-                    <h3 className="text-xl font-bold text-neutral-100 mb-3 group-hover:text-red-400 transition-colors leading-snug">
+                    <h3 className="text-lg font-semibold text-neutral-100 mb-3 group-hover:text-red-400 transition-colors leading-snug">
                         {idea.title}
                     </h3>
 
