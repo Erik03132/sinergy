@@ -17,6 +17,9 @@ export async function askMoonshot(prompt: string): Promise<string> {
     if (!apiKey) throw new Error('MOONSHOT_API_KEY missing')
 
     try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 20000)
+
         const response = await fetch('https://api.moonshot.cn/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -30,8 +33,10 @@ export async function askMoonshot(prompt: string): Promise<string> {
                     { role: 'user', content: prompt }
                 ],
                 temperature: 0.3
-            })
+            }),
+            signal: controller.signal
         })
+        clearTimeout(timeoutId)
 
         if (!response.ok) {
             const err = await response.text()

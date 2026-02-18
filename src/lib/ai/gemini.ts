@@ -18,11 +18,10 @@ interface GeminiResponse {
 }
 
 const MODELS = [
-    'gemini-2.0-flash', // Flash is faster and supports search better
-    'gemini-2.0-flash-lite',
-    'openrouter',
-    'moonshot',
-    'deepseek'
+    'gemini-2.0-flash',       // Primary: Fastest & most reliable
+    'openrouter',             // Fallback 1: High availability
+    'gemini-2.0-flash-lite',  // Fallback 2: Lightweight
+    'deepseek'                // Fallback 3
 ]
 
 async function fetchGemini(model: string, apiKey: string, prompt: string, search: boolean = false) {
@@ -34,15 +33,23 @@ async function fetchGemini(model: string, apiKey: string, prompt: string, search
         body.tools = [{ google_search_retrieval: {} }]
     }
 
-    const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-        }
-    )
-    return response
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 25000) // 25s timeout
+
+    try {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+                signal: controller.signal
+            }
+        )
+        return response
+    } finally {
+        clearTimeout(timeoutId)
+    }
 }
 
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
@@ -69,7 +76,7 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
                 // If rate limited, wait and try next
                 if (response.status === 429 || response.status === 503 || response.status === 404) {
                     console.warn(`⚠️ ${model} issue (${response.status}). Switching provider...`)
-                    await delay(500)
+                    await delay(100)
                     continue
                 }
             }
@@ -80,16 +87,6 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
                     return await askOpenRouter(prompt)
                 } catch (e) {
                     console.warn('OpenRouter failed, trying next...')
-                    continue
-                }
-            }
-
-            // Handle Moonshot (Kimi)
-            else if (model === 'moonshot') {
-                try {
-                    return await askMoonshot(prompt)
-                } catch (e) {
-                    console.warn('Moonshot failed, trying next...')
                     continue
                 }
             }
@@ -106,7 +103,7 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
 
         } catch (e) {
             console.error(`❌ Provider error (${model}):`, e)
-            await delay(500)
+            await delay(100)
         }
     }
 

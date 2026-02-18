@@ -30,6 +30,9 @@ export async function askOpenRouter(prompt: string): Promise<string> {
     for (const model of OR_MODELS) {
         try {
             console.log(`🦄 Asking OpenRouter (${model})...`)
+            const controller = new AbortController()
+            const timeoutId = setTimeout(() => controller.abort(), 20000)
+
             const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
                 method: 'POST',
                 headers: {
@@ -45,8 +48,10 @@ export async function askOpenRouter(prompt: string): Promise<string> {
                         { role: 'user', content: prompt }
                     ],
                     temperature: 0.3
-                })
+                }),
+                signal: controller.signal
             })
+            clearTimeout(timeoutId)
 
             if (!response.ok) {
                 const err = await response.text()

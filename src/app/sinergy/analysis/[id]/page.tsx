@@ -19,6 +19,7 @@ export default function AnalysisPage() {
     const [isLoading, setIsLoading] = useState(true)
     const [isAnalyzing, setIsAnalyzing] = useState(false)
     const [userThoughts, setUserThoughts] = useState('')
+    const [error, setError] = useState<string | null>(null)
 
     useEffect(() => {
         const fetchIdea = async () => {
@@ -58,6 +59,7 @@ export default function AnalysisPage() {
 
     const triggerAnalysis = async (ideaData: Idea, additionalContext?: string) => {
         setIsAnalyzing(true)
+        setError(null)
         try {
             const res = await fetch('/api/sinergy/analyze', {
                 method: 'POST',
@@ -93,7 +95,8 @@ export default function AnalysisPage() {
             toast.success(additionalContext ? 'Анализ обновлен!' : 'Анализ завершен!')
         } catch (error) {
             console.error(error)
-            toast.error('Не удалось сгенерировать анализ. Попробуйте позже.')
+            setError('Не удалось сгенерировать анализ. Попробуйте нажать кнопку повтора.')
+            toast.error('Ошибка генерации стратегии.')
         } finally {
             setIsAnalyzing(false)
         }
@@ -107,6 +110,34 @@ export default function AnalysisPage() {
         )
     }
 
+    // Error state
+    if (error && !analysis) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-6 pt-20 px-6 text-center">
+                <div className="p-4 bg-red-500/10 rounded-2xl border border-red-500/20">
+                    <ShieldAlert className="w-12 h-12 text-red-500" />
+                </div>
+                <div className="space-y-2">
+                    <h2 className="text-xl font-bold text-white">Упс! Сбой ИИ</h2>
+                    <p className="text-neutral-400 max-w-xs">{error}</p>
+                </div>
+                <button
+                    onClick={() => triggerAnalysis(idea)}
+                    className="flex items-center gap-2 px-6 py-3 bg-white text-black rounded-full font-bold hover:bg-neutral-200 transition-all active:scale-95"
+                >
+                    <RefreshCcw className="w-5 h-5" />
+                    Попробовать снова
+                </button>
+                <button
+                    onClick={() => router.back()}
+                    className="text-neutral-500 hover:text-white transition-colors text-sm"
+                >
+                    Вернуться назад
+                </button>
+            </div>
+        )
+    }
+
     // Is analyzing state
     if (isAnalyzing || !analysis) {
         return (
@@ -114,6 +145,7 @@ export default function AnalysisPage() {
                 <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
                 <p className="text-neutral-400 animate-pulse">Генерация стратегии...</p>
                 <p className="text-xs text-neutral-600">Опрашиваем ИИ-экспертов (Gemini, DeepSeek)...</p>
+                <p className="text-[10px] text-neutral-700 max-w-[200px] text-center italic">Первая генерация может занять до 15 секунд</p>
             </div>
         )
     }
