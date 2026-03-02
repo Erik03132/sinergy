@@ -1,0 +1,24 @@
+@import 'tailwindcss';
+
+/* ================================================
+   Базовые стили шаблона
+   Минимальный, чистый дизайн
+   Красота добавляется позже через STYLE_BANK / Stitch
+   ================================================ */
+
+:root {
+  /* Тема: Сероцветный Лакшери (из STYLE_BANK) */
+  --background: #0a0a0a;
+  --foreground: #f5f5f5;
+  --primary: #10b981;
+  --primary-hover: #059669;
+  --card-bg: rgba(23, 23, 23, 0.4);
+  --card-border: rgba(38, 38, 38, 0.5);
+  --muted: #737373;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}

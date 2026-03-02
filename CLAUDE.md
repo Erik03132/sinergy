@@ -1,0 +1,53 @@
+# Правила проекта
+> [!IMPORTANT]
+> Всегда следуйте фундаментальным принципам из [SKILLS.md](./SKILLS.md).
+
+
+## Язык
+- Общение: **русский**
+- Комментарии в коде: русский
+- Переменные и функции: английский
+
+## TypeScript
+- `catch (error: unknown)` — **НИКОГДА** `any`
+- Неиспользуемые параметры: префикс `_` (напр. `_request`)
+- Строгий `tsconfig.json` с `strict: true`
+- Каждый компонент/модуль имеет типизированные props/interfaces
+
+## Next.js
+- Шрифты: **только** через `next/font`, никогда через `<link>` в `<head>`
+- Изображения: **только** через `next/image`
+- Server Components по умолчанию, `'use client'` только когда необходимо
+- Route Handlers: `export async function POST(_request: Request)` если request не используется
+
+## Deployment Protocol
+- **ALWAYS** run `/pre-deploy` (or `npm run build`) locally before pushing.
+- **NEVER** treat Vercel as a compiler. If it fails locally, it will fail on Vercel.
+- If `EPERM` errors occur during build, delete `.next` folder and retry.
+
+## Technical Context
+- **Stack:** Next.js 15 (App Router), TypeScript, Tailwind, Supabase, Gemini AI.
+- **Styling:** Tailwind CSS. Use `cn()` for class merging.
+- **State:** React Hooks (`useState`, `useEffect`) and Server Actions.
+- **Database:** Supabase (Client & Server usage split).
+
+## Качество кода
+- Перед коммитом: `npm run lint && npm run type-check` (автоматически через Husky)
+- Перед деплоем: `npm run pre-deploy` (lint + types + build + test)
+- Функции < 20 строк, один уровень ответственности
+- Никаких `console.log` в production коде (только `console.error`)
+
+## Git
+- Conventional commits: `fix:`, `feat:`, `chore:`, `docs:`
+- Ветки: `main` (прод), `dev` (разработка), `feat/xxx` (фичи)
+
+## Документация
+- `CLAUDE.md`: Основные правила разработки и типизации
+- `SKILLS.md`: Фундаментальные принципы дизайна и отказоустойчивости AI
+- `STYLE_BANK.md`: Библиотека визуальных тем
+- `MANUAL.md`: Руководство пользователя и Roadmap
+
+## Деплой
+- Vercel подключается к проекту-копии (не к шаблону)
+- Все env через `.env.template` + Vercel Dashboard
+- CI через GitHub Actions (lint → types → build → test)
