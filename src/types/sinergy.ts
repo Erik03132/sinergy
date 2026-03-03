@@ -56,6 +56,7 @@ export interface Idea {
 
 export interface SynergyResult {
   status: 'calculating' | 'synergy_found' | 'no_more_synergy' | 'error';
+  idea_id?: string;
   score?: number;
   synergy_score?: number;
   components?: [Idea, Idea];

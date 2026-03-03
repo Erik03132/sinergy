@@ -248,10 +248,44 @@ export async function POST() {
             }
         })
 
+        // Automatically save to the 'ideas' table (Archive) 
+        const classification = synthesisResult.classification || {}
+        const newIdea = {
+            source: 'synergy',
+            title: synthesisResult.synergy_title,
+            description: synthesisResult.synergy_description || "",
+            is_favorite: false,
+            is_synergy: true,
+            vertical: classification.vertical || 'Other',
+            core_tech: classification.core_tech || [],
+            target_audience: classification.target_audience || 'General',
+            business_model: classification.business_model || 'TBD',
+            pain_point: ['Синтезировано блендером'],
+            temporal_marker: 'Now',
+            metadata: {
+                logic_chain: synthesisResult.logic_chain,
+                score: scores.total,
+                mode: modeTitle,
+                components: [a, b],
+                is_auto_saved: true
+            }
+        }
+
+        let idea_id = null
+        try {
+            const { data: savedIdea } = await supabase.from('ideas').insert(newIdea).select('id').maybeSingle()
+            if (savedIdea) {
+                idea_id = savedIdea.id
+            }
+        } catch (err) {
+            console.error('Failed to auto-save synergy idea', err)
+        }
+
         return NextResponse.json({
             status: 'success',
             synergy_status: 'synergy_found',
             mode: modeTitle,
+            idea_id: idea_id,
             ...synthesisResult,
             scores: {
                 total: Math.round(scores.total * 10) / 10,

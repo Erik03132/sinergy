@@ -87,22 +87,36 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
         if (isSaved) return null
         setIsSaving(true)
         try {
-            const res = await fetch('/api/sinergy/classify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    title: result.synergy_title || `Синергия: ${result.components?.[0].title} + ${result.components?.[1].title}`,
-                    description: result.synergy_description || result.hypothesis || "",
-                    is_favorite: true,
-                    source: 'synergy',
-                    ...result.classification
-                }),
-            })
-            if (!res.ok) throw new Error('Ошибка при сохранении')
-            const data = await res.json()
+            let savedId = result.idea_id;
+
+            if (savedId) {
+                const res = await fetch('/api/sinergy/ideas/favorite', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: savedId, is_favorite: true }),
+                })
+                if (!res.ok) throw new Error('Ошибка при сохранении')
+            } else {
+                // Fallback old behavior
+                const res = await fetch('/api/sinergy/classify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        title: result.synergy_title || `Синергия: ${result.components?.[0].title} + ${result.components?.[1].title}`,
+                        description: result.synergy_description || result.hypothesis || "",
+                        is_favorite: true,
+                        source: 'synergy',
+                        ...result.classification
+                    }),
+                })
+                if (!res.ok) throw new Error('Ошибка при сохранении')
+                const data = await res.json()
+                savedId = data.id as string
+            }
+
             setIsSaved(true)
             if (!silent) toast.success("Сохранено в Избранное!")
-            return data.id as string
+            return savedId
         } catch (e) {
             if (!silent) toast.error("Не удалось сохранить.")
             return null
