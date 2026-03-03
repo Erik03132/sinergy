@@ -38,9 +38,14 @@ export async function fetchAndStoreFeed() {
 
     // 1. GLOBAL AI DISCOVERY
     const discoveryPrompt = `
-        Search your internal knowledge for 10 RECENT (this month) startup launches, AI tools, or micro-SaaS case studies.
-        Focus on projects from ProductHunt, IndieHackers, or Reddit.
-        Target: innovative apps with budget <$100k.
+        Search your internal knowledge for 10 RECENT startup launches, AI tools, or micro-SaaS case studies.
+        Target: innovative apps, SaaS, and automation tools with budget <$100k.
+        
+        Focus on: Solopreneurship, Bootstrapping, Indie Hacking, AI-agents, Micro-SaaS gems.
+        
+        ЗАПРЕЩЕНО (ИСКЛЮЧАЙ): новости налогов, законов РФ, господдержки, вебинары, курсы, "поддержка бизнеса", общие советы.
+        НАМ НЕ НУЖНЫ корпоративные новости или новости госсектора.
+        
         Output MUST be Valid JSON Array: 
         [{ "title": "Заголовок", "summary": "Детальное описание (3-5 предложений) о пользе и монетизации", "url": "...", "source": "Indie Hackers" }]
         ALL TEXT IN RUSSIAN.
@@ -51,24 +56,33 @@ export async function fetchAndStoreFeed() {
         const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
         const jsonMatch = clean.match(/\[[\s\S]*\]/);
         const newsItems = JSON.parse(jsonMatch ? jsonMatch[0] : clean);
+        const { isContentBanned } = await import("./source-processor");
 
         if (newsItems && newsItems.length > 0) {
             const { data: recent } = await supabase.from('ideas').select('original_url, title').limit(50);
             const existingUrls = new Set(recent?.map(e => e.original_url));
             const seenTitles = new Set(recent?.map(e => e.title));
 
-            const inserts = newsItems
-                .filter((item: any) => item.url && !existingUrls.has(item.url) && !seenTitles.has(item.title))
-                .map((item: any) => ({
-                    source: 'automatic',
-                    title: item.title,
-                    description: item.summary,
-                    vertical: 'News',
-                    original_url: item.url,
-                    is_synergy: false,
-                    temporal_marker: new Date().toISOString().split('T')[0],
-                    metadata: { type: 'global_search', original_source: item.source }
-                }));
+            const filteredItems = newsItems.filter((item: any) => {
+                const textToCheck = `${item.title} ${item.summary}`.toLowerCase();
+                return (
+                    item.url &&
+                    !existingUrls.has(item.url) &&
+                    !seenTitles.has(item.title) &&
+                    !isContentBanned(textToCheck)
+                );
+            });
+
+            const inserts = filteredItems.map((item: any) => ({
+                source: 'automatic',
+                title: item.title,
+                description: item.summary,
+                vertical: 'News',
+                original_url: item.url,
+                is_synergy: false,
+                temporal_marker: new Date().toISOString().split('T')[0],
+                metadata: { type: 'global_search', original_source: item.source }
+            }));
 
             if (inserts.length > 0) await supabase.from('ideas').insert(inserts);
         }

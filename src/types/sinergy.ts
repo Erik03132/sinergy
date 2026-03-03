@@ -1,4 +1,6 @@
 
+export type Vertical = 'HealthTech' | 'AI-infrastructure' | 'EdTech' | 'FinTech' | 'ProductivityTools' | 'CleanTech' | 'Logistics' | 'Entertainment' | 'Other' | 'News' | 'News (AI)';
+
 export interface DetailedAnalysis {
   status: 'pending' | 'completed' | 'failed';
   market: {

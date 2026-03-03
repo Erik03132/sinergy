@@ -9,15 +9,11 @@ import {
     isAntiPattern
 } from '@/lib/sinergy/scoring'
 import { Idea, SynergyResult } from '@/types/sinergy'
+import { SYNERGY_BANNED_PATTERNS } from '@/lib/sinergy/constants'
 import { NextResponse } from 'next/server'
 
-// Comprehensive Banned Patterns from user's request
-const BANNED_PATTERNS = [
-    'all-in-one', 'aggregator', 'dashboard', 'platform', 'portal', 'витрина', 'каталог',
-    'micro-crm', 'мини-crm', 'crm-система', 'маркетплейс',
-    'saas для', 'универсальный', 'сервис учета', 'система управления',
-    'онлайн-конструктор', 'интеграция', 'автоматизация процессов'
-]
+// Comprehensive Banned Patterns from constants
+const BANNED_PATTERNS = SYNERGY_BANNED_PATTERNS
 
 // Advanced Catalysts with Domain Affinity
 const EVOLUTION_CATALYSTS = [

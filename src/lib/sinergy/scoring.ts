@@ -1,4 +1,5 @@
 import { Idea, SynergyScoreBreakdown } from '@/types/sinergy'
+import { VERTICAL_COMPATIBILITY } from './constants'
 
 // ===== МАТРИЦА СОВМЕСТИМОСТИ ТЕХНОЛОГИЙ =====
 const TECH_COMPATIBILITY_MATRIX: Record<string, Record<string, number>> = {
@@ -40,7 +41,13 @@ function calculateVerticalDistance(vA: string = '', vB: string = ''): number {
     return 1 - overlapRatio(vA, vB)
 }
 
-function isTechSynergistic(techA: string[] = [], techB: string[] = [], threshold = 0.6): boolean {
+export function isVerticalCompatible(a: Idea, b: Idea): boolean {
+    if (a.vertical === b.vertical) return true;
+    return VERTICAL_COMPATIBILITY[a.vertical || ""]?.includes(b.vertical || "") ||
+        VERTICAL_COMPATIBILITY[b.vertical || ""]?.includes(a.vertical || "") || false;
+}
+
+export function isTechSynergistic(techA: string[] = [], techB: string[] = [], threshold = 0.6): boolean {
     let maxCompat = 0
     techA.forEach(tA => {
         techB.forEach(tB => {

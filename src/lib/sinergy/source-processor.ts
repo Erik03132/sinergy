@@ -2,6 +2,7 @@
 import { createClient } from "../supabase/server";
 import { askGemini } from "../ai/gemini";
 import { extractTelegramInfo, getRecentTelegramPosts } from "./telegram";
+import { BANNED_KEYWORDS } from "./constants";
 
 export async function registerChannel(details: { title: string; url: string; sourceType: 'telegram' | 'web' }) {
     const supabase = await createClient();
@@ -17,6 +18,17 @@ export async function registerChannel(details: { title: string; url: string; sou
     }
 }
 
+
+export function isContentBanned(text: string): boolean {
+    const lower = text.toLowerCase();
+    const trigger = BANNED_KEYWORDS.find(kw => lower.includes(kw));
+    if (trigger) {
+        console.log(`[BANNED] Triggered by "${trigger}" in text: ${text.substring(0, 50)}...`);
+        return true;
+    }
+    return false;
+}
+
 /**
  * Атомарное извлечение идей. 
  * Из одного источника (статьи/поста) теперь может быть создано НЕСКОЛЬКО карточек.
@@ -26,35 +38,42 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
 
     // AI Analysis - Агрессивный поиск МНОЖЕСТВА идей внутри текста
     const content = details.text || details.title || "";
+
+    // Пре-фильтрация (экономим токены, если там явно мусор)
+    if (isContentBanned(content)) {
+        console.log(`[Processor] Source text is BANNED, skipping AI call for: ${details.url.substring(0, 30)}...`);
+        return;
+    }
+
     const prompt = `
         Действуй как профессиональный ИИ-аналитик стартапов и венчурный скаут. 
         Твоя задача: найти ПРИКЛАДНЫЕ бизнес-идеи, конкретные стартапы или новые инструменты.
         
-        СТРОГИЕ ПРАВИЛА ФИЛЬТРАЦИИ:
-        1. ЗАПРЕЩЕНО (ИСКЛЮЧАЙ СРАЗУ): 
-           - Новости законодательства, налоги, изменения в УК/КоАП.
-           - Меры господдержки (гранты, субсидии, льготы Минфина).
-           - Анонсы вебинаров, конференций, стримов, встреч.
-           - Общие советы по бизнесу (как нанимать, как мотивировать).
-           - Статьи-мнения о рынке вообще.
+        СТРОГИЕ ПРАВИЛА ФИЛЬТРАЦИИ (ЕСЛИ ЭТО ЕСТЬ — ВЕРНИ ПУСТОЙ МАССИВ []):
+        1. ЗАПРЕЩЕНО (ИСКЛЮЧАЙ СРАЗУ, ЭТО "МУСОР"): 
+           - Новости законодательства, налоги, изменения в УК/КоАП, маркировка товаров.
+           - Меры господдержки (гранты, субсидии, льготы Минфина, выплаты, центры "Мой Бизнес").
+           - "Малый бизнес", "МСП" в контексте стандартных новостей РФ или госпомощи.
+           - Анонсы вебинаров, конференций, стримов, встреч, воркшопов, бизнес-завтраков.
+           - Общие советы по бизнесу (как нанимать, как мотивировать, психология, лидерство).
+           - Статьи-мнения о рынке вообще («Что будет с рынком в 2026 году»).
+           - Обзоры новостей за неделю/день без фокуса на конкретном IT-продукте.
+ 
+        2. ЧТО МЫ ИЩЕМ (ТОЛЬКО ЭТО РАЗРЕШЕНО):
+           - Конкретные IT-продукты, полезные SaaS, мобильные приложения, AI-инструменты.
+           - Описание НОВОГО способа заработать или кейс автоматизации с бюджетом <$100k.
+           - AI-агенты, утилиты для разработчиков, плагины, расширения.
+           - Новые фичи в технологических гигантах, влияющие на рынок инструментов.
         
-        2. ЧТО МЫ ИЩЕМ (РАЗРЕШЕНО):
-           - Конкретные IT-продукты, SaaS, мобильные приложения.
-           - AI-инструменты, чат-боты, утилиты автоматизации.
-           - Новые фичи в существующих сервисах.
-           - Кейсы заработка на конкретных технологиях (например: "Как я заработал на боте для...")
+        3. ТОЛЬКО КОНКРЕТИКА: 
+           - Название (Title) должно быть названием продукта или конкретным кейсом. 
+           - Описание (Summary) должно отвечать на вопрос: "Как это использовать для бизнеса или заработка?".
         
-        3. АТОМАРНОСТЬ: Один продукт = Один объект. Если в тексте 3 стартапа - верни 3 объекта.
-        
-        Требования к объекту:
-        - title: Название продукта/сервиса.
-        - summary: Максимально прикладное: ЧТО это за инструмент? КОМУ он нужен? КАКОВ его функционал?
-        
-        ЕСЛИ В ТЕКСТЕ НЕТ КОНКРЕТНОГО ИНСТРУМЕНТА/ПРОДУКТА — ВЕРНИ ПУСТОЙ МАССИВ []. 
+        ЕСЛИ ТЕКСТ СОДЕРЖИТ ВЕБИНАР, НОВОСТИ ЗАКОНОВ ИЛИ ГОСПОДДЕРЖКУ — ВЕРНИ ПУСТОЙ МАССИВ []. 
         ЛУЧШЕ НИЧЕГО НЕ ВЕРНУТЬ, ЧЕМ ВЕРНУТЬ "ВОДУ".
         
         ТЕКСТ:
-        """${content.substring(0, 7000)}"""
+        """${content.substring(0, 8000)}"""
     `;
 
     let extractedIdeas: any[] = [];
@@ -67,7 +86,13 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
         const jsonMatch = clean.match(/\[[\s\S]*\]/);
         extractedIdeas = JSON.parse(jsonMatch ? jsonMatch[0] : (clean || "[]"));
 
-        console.log(`[Processor] Extracted ${extractedIdeas.length} ideas from source.`);
+        // Дополнительная фильтрация после AI на случай если он проигнорировал системные инструкции
+        extractedIdeas = extractedIdeas.filter(idea => {
+            const textToCheck = `${idea.title} ${idea.summary}`.toLowerCase();
+            return !isContentBanned(textToCheck);
+        });
+
+        console.log(`[Processor] Extracted ${extractedIdeas.length} ideas after filtering.`);
     } catch (e: any) {
         console.warn("[Processor] AI extraction failed or returned empty:", e.message);
         extractedIdeas = [];
