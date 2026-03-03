@@ -250,16 +250,36 @@ export async function POST() {
 
         // Automatically save to the 'ideas' table (Archive) 
         const classification = synthesisResult.classification || {}
+
+        const safeString = (val: any, fallback: string) => {
+            if (!val) return fallback;
+            if (typeof val === 'string') return val;
+            return JSON.stringify(val);
+        };
+
+        const safeTitle = safeString(synthesisResult.synergy_title, "Новая Возможность");
+        const safeDesc = safeString(synthesisResult.synergy_description || synthesisResult.hypothesis, "");
+        const safeVertical = safeString(classification.vertical, "Other");
+        const safeTargetAudience = safeString(classification.target_audience, "General");
+        const safeBusinessModel = safeString(classification.business_model, "TBD");
+
+        let safeCoreTech: string[] = [];
+        if (Array.isArray(classification.core_tech)) {
+            safeCoreTech = classification.core_tech.map(String);
+        } else if (typeof classification.core_tech === 'string') {
+            safeCoreTech = [classification.core_tech];
+        }
+
         const newIdea = {
             source: 'synergy',
-            title: synthesisResult.synergy_title,
-            description: synthesisResult.synergy_description || "",
+            title: safeTitle,
+            description: safeDesc,
             is_favorite: false,
             is_synergy: true,
-            vertical: classification.vertical || 'Other',
-            core_tech: classification.core_tech || [],
-            target_audience: classification.target_audience || 'General',
-            business_model: classification.business_model || 'TBD',
+            vertical: safeVertical,
+            core_tech: safeCoreTech,
+            target_audience: safeTargetAudience,
+            business_model: safeBusinessModel,
             pain_point: ['Синтезировано блендером'],
             temporal_marker: 'Now',
             metadata: {
@@ -273,8 +293,10 @@ export async function POST() {
 
         let idea_id = null
         try {
-            const { data: savedIdea } = await supabase.from('ideas').insert(newIdea).select('id').maybeSingle()
-            if (savedIdea) {
+            const { data: savedIdea, error } = await supabase.from('ideas').insert(newIdea).select('id').maybeSingle()
+            if (error) {
+                console.error("Supabase Insert Error for synergy:", error);
+            } else if (savedIdea) {
                 idea_id = savedIdea.id
             }
         } catch (err) {
