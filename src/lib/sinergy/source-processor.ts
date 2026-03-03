@@ -36,6 +36,20 @@ export function isContentBanned(text: string): boolean {
 async function registerSource(details: any, type: 'telegram' | 'web') {
     const supabase = await createClient();
 
+    // Быстрый фильтр (Уже парсили этот URL?)
+    if (details.url) {
+        const { data: urlCheck } = await supabase
+            .from('ideas')
+            .select('id')
+            .eq('original_url', details.url)
+            .limit(1);
+
+        if (urlCheck && urlCheck.length > 0) {
+            console.log(`[Processor] URL already processed, skipping: ${details.url}`);
+            return;
+        }
+    }
+
     // AI Analysis - Многошаговый "фильтр идей" (Семантический подход)
     const content = details.text || details.title || "";
 
@@ -124,10 +138,10 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
         const { data: existing } = await supabase
             .from('ideas')
             .select('id')
-            .eq('title', idea.title)
-            .maybeSingle();
+            .eq('title', idea.title.trim())
+            .limit(1);
 
-        if (existing) {
+        if (existing && existing.length > 0) {
             console.log(`[Processor] Idea already exists: ${idea.title}`);
             continue;
         }

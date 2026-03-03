@@ -75,7 +75,10 @@ export async function fetchAndStoreFeed() {
         const { isContentBanned } = await import("./source-processor");
 
         if (newsItems && newsItems.length > 0) {
-            const { data: recent } = await supabase.from('ideas').select('original_url, title').limit(50);
+            const { data: recent } = await supabase.from('ideas')
+                .select('original_url, title')
+                .order('created_at', { ascending: false })
+                .limit(200);
             const existingUrls = new Set(recent?.map(e => e.original_url));
             const seenTitles = new Set(recent?.map(e => e.title));
 
