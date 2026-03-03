@@ -53,7 +53,17 @@ export async function fetchAndStoreFeed() {
         We need REAL STARTUPS and APPLIED BUSINESS IDEAS.
         
         Output MUST be Valid JSON Array: 
-        [{ "title": "Название стартапа/идеи", "summary": "Детальное описание бизнес-модели, кто платит и за что", "url": "...", "source": "Indie Hackers" }]
+        [
+          {
+            "title": "Название стартапа/идеи",
+            "summary": "Детальное описание бизнес-модели, кто платит и за что",
+            "target_audience": "Целевая аудитория",
+            "pain_point": "Какую проблему решает",
+            "business_model": "Монетизация",
+            "url": "...",
+            "source": "Indie Hackers"
+          }
+        ]
         ALL TEXT IN RUSSIAN.
     `;
 
@@ -61,7 +71,7 @@ export async function fetchAndStoreFeed() {
         const raw = await askGemini(discoveryPrompt, { search: false });
         const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
         const jsonMatch = clean.match(/\[[\s\S]*\]/);
-        const newsItems = JSON.parse(jsonMatch ? jsonMatch[0] : clean);
+        const newsItems = JSON.parse(jsonMatch ? jsonMatch[0] : (clean || "[]"));
         const { isContentBanned } = await import("./source-processor");
 
         if (newsItems && newsItems.length > 0) {
@@ -86,6 +96,10 @@ export async function fetchAndStoreFeed() {
                 vertical: 'News',
                 original_url: item.url,
                 is_synergy: false,
+                core_tech: item.core_tech ? [item.core_tech] : [],
+                target_audience: item.target_audience || 'General',
+                business_model: item.business_model || 'Startup',
+                pain_point: item.pain_point ? [item.pain_point] : [],
                 temporal_marker: new Date().toISOString().split('T')[0],
                 metadata: { type: 'global_search', original_source: item.source }
             }));

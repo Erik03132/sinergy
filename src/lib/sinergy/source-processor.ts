@@ -36,40 +36,47 @@ export function isContentBanned(text: string): boolean {
 async function registerSource(details: any, type: 'telegram' | 'web') {
     const supabase = await createClient();
 
-    // AI Analysis - Агрессивный поиск МНОЖЕСТВА идей внутри текста
+    // AI Analysis - Многошаговый "фильтр идей" (Семантический подход)
     const content = details.text || details.title || "";
 
-    // Пре-фильтрация (экономим токены, если там явно мусор)
+    // 1. Быстрый фильтр (Анти-шум по ключевым словам)
     if (isContentBanned(content)) {
         console.log(`[Processor] Source text is BANNED, skipping AI call for: ${details.url.substring(0, 30)}...`);
         return;
     }
 
+    // 2. Семантический классификатор и извлечение "Якорей" (Target Audience, Pain Point, Solution, Monetization)
     const prompt = `
-        Действуй как профессиональный ИИ-аналитик стартапов и венчурный скаут. 
-        Твоя ПЕРВАЯ И ГЛАВНАЯ цель: находить РЕАЛЬНЫЕ БИЗНЕС-ИДЕИ и СТАРТАПЫ (готовые B2B/B2C SaaS, приложения, платформы).
+        Действуй как семантический классификатор и аналитик стартап-идей. 
+        Твоя задача — проанализировать текст и извлечь структурированные данные о стартапах/продуктах.
         
-        СТРОГИЕ ПРАВИЛА ФИЛЬТРАЦИИ (ЕСЛИ В ТЕКСТЕ ОДНА ИЗ ЭТИХ ТЕМ — ВЕРНИ ПУСТОЙ МАССИВ [] СТРОГО):
-        1. ЗАПРЕЩЕНО (ИСКЛЮЧАЙ СРАЗУ, ЭТО "МУСОР"): 
-           - КУРСЫ и ОБУЧЕНИЕ: Бесплатные/платные курсы (особенно нейросети, контент-заводы, как заработать 200 тысяч), марафоны, обучение профессии, вебинары, интенсивы.
-           - НОВОСТИ НЕЙРОСЕТЕЙ ОТ ГИГАНТОВ: Релизы ChatGPT, Google Veo 3, Midjourney, Runway (нам нужны микро-СТАРТАПЫ независимых фаундеров, а не новости бигтеха).
-           - РАЗВЛЕКАТЕЛЬНЫЕ ИИ-ФИШКИ: Как изменить фото, эффект движения, как создать мем и т.д.
-           - ГОССЕКТОР: Новости законодательства, налоги, меры господдержки, гранты.
-           - ВОДА И МНЕНИЯ: Общие советы по бизнесу, абстрактные мнения о рынке, новости о найме/лидерстве.
-  
-        2. ЧТО МЫ ИЩЕМ (ТОЛЬКО ЭТО РАЗРЕШЕНО):
-           - СТАРТАПЫ: Описание конкретного бизнес-проекта (Indie Hackers, Micro-SaaS), его суть и модель монетизации (кто платит и за что).
-           - БИЗНЕС-ИДЕИ: Описание узкоспециализированной, но рабочей ниши для создания своего IT-проекта/сервиса.
+        КРИТЕРИИ "НАСТОЯЩЕЙ ИДЕИ / СТАРТАПА":
+        Документ является стартапом/идеей, только если четко прослеживаются минимум 2-3 якоря:
+        - Аудитория (кто платит / кто использует).
+        - Боль/Проблема (с чем борются: экономия времени, рост конверсии).
+        - Решение (SaaS, платформа, приложение, маркетплейс).
+        - Монетизация (B2B, подписка, комиссия).
         
-        3. ТОЛЬКО КОНКРЕТИКА: 
-           - Название (Title) должно быть названием стартапа или краткой сутью бизнес-идеи. Без "Бесплатный курс..." или "Новая фича...".
-           - Описание (Summary) должно отвечать на вопрос: "Что за продукт, какую проблему решает и как именно зарабатывает?".
+        Если в тексте просто "новости", "советы по жизни", "анонс обновления ChatGPT" или "бесплатный курс" — это НЕ ИДЕЯ.
         
-        ЕСЛИ ТЕКСТ СОДЕРЖИТ АНОНС КУРСА, НОВОСТЬ ПРО ФИЧУ НЕЙРОСЕТИ ИЛИ ГОСПОДДЕРЖКУ — ВЕРНИ ПУСТОЙ МАССИВ []. 
-        ЛУЧШЕ ВЕРНУТЬ [], ЧЕМ МУСОР ИЛИ "ВОДУ".
+        ВЫХОДНОЙ ФОРМАТ СТРОГО JSON (МАССИВ ОБЪЕКТОВ):
+        [
+          {
+            "title": "Название стартапа / Краткая суть идеи",
+            "summary": "Подробное описание решения и ценности (3-5 предложений)",
+            "target_audience": "Кто целевая аудитория (например: малый B2B, маркетологи)",
+            "pain_point": "Какую конкретно проблему решает",
+            "business_model": "Модель монетизации (SaaS, Marketplace, Subscription, API, Ads)",
+            "core_tech": "Ключевая технология (AI, Blockchain, No-code и т.д.)",
+            "score": <число от 0 до 10, где 10 - идеальный стартап, 0 - просто статья/новость/вода>
+          }
+        ]
         
-        ТЕКСТ:
-        """\${content.substring(0, 8000)}"""
+        Если текст — полная "вода" (анонс стрима, законы РФ, мотивация), возвращай [].
+        ВСЕ ТЕКСТЫ В JSON ДОЛЖНЫ БЫТЬ НА РУССКОМ ЯЗЫКЕ.
+        
+        ТЕКСТ ДЛЯ АНАЛИЗА:
+        """\${content.substring(0, 10000)}"""
     `;
 
     let extractedIdeas: any[] = [];
@@ -79,16 +86,22 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
 
         // Очистка от markdown блоков и лишнего текста
         const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-        const jsonMatch = clean.match(/\[[\s\S]*\]/);
+        const jsonMatch = clean.match(/\\[[\\s\\S]*\\]/);
         extractedIdeas = JSON.parse(jsonMatch ? jsonMatch[0] : (clean || "[]"));
 
-        // Дополнительная фильтрация после AI на случай если он проигнорировал системные инструкции
-        extractedIdeas = extractedIdeas.filter(idea => {
+        // 3. Фильтрация "score" (Семантический ранжировщик) и финальный санитарный чек
+        extractedIdeas = extractedIdeas.filter((idea: any) => {
             const textToCheck = `${idea.title} ${idea.summary}`.toLowerCase();
-            return !isContentBanned(textToCheck);
+            const badKeyword = isContentBanned(textToCheck);
+            const scoreOk = typeof idea.score === 'number' && idea.score >= 6; // Порог идеевости
+
+            if (!scoreOk) console.log(`[Filter] Rejected due to low semantics score (${idea.score}): ${idea.title}`);
+            if (badKeyword) console.log(`[Filter] Rejected by keyword constraint: ${idea.title}`);
+
+            return !badKeyword && scoreOk;
         });
 
-        console.log(`[Processor] Extracted ${extractedIdeas.length} ideas after filtering.`);
+        console.log(`[Processor] Extracted ${extractedIdeas.length} ideas after semantic filtering.`);
     } catch (e: any) {
         console.warn("[Processor] AI extraction failed or returned empty:", e.message);
         extractedIdeas = [];
@@ -99,13 +112,13 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
     for (const idea of extractedIdeas) {
         if (!idea.title || !idea.summary) continue;
 
-        // Создаем уникальный ID для каждой идеи внутри одного URL (на основе заголовка)
+        // Создаем уникальный ID 
         const ideaHash = Buffer.from(idea.title).toString('base64').substring(0, 8);
         const externalId = type === 'telegram' ?
             `${details.channelHandle}_${details.id}_${ideaHash}` :
             `${Buffer.from(details.url).toString('base64').substring(0, 15)}_${ideaHash}`;
 
-        // Проверка на дубликаты именно по заголовку в базе
+        // Проверка на дубликаты
         const { data: existing } = await supabase
             .from('ideas')
             .select('id')
@@ -124,10 +137,10 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
             vertical: 'News',
             original_url: details.url,
             is_synergy: false,
-            core_tech: [],
-            target_audience: 'General',
-            business_model: 'Startup',
-            pain_point: [],
+            core_tech: idea.core_tech ? [idea.core_tech] : [],
+            target_audience: idea.target_audience || 'General',
+            business_model: idea.business_model || 'Startup',
+            pain_point: idea.pain_point ? [idea.pain_point] : [],
             temporal_marker: new Date().toISOString().split('T')[0],
             metadata: {
                 external_id: externalId,
@@ -136,13 +149,14 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
                 thumbnail: details.imageUrl || null,
                 is_extracted: true,
                 scanned_at: new Date().toISOString(),
-                is_auto: true
+                is_auto: true,
+                semantic_score: idea.score
             }
         };
 
-
         const { error } = await supabase.from('ideas').insert(insertData);
-        if (!error) console.log(`[Processor] Extracted & Saved: ${idea.title}`);
+        if (!error) console.log(`[Processor] Saved Concept: ${idea.title} (Score: ${idea.score})`);
+        else console.error("[Processor] Saving error:", error.message);
     }
 }
 
