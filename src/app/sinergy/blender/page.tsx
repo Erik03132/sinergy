@@ -159,11 +159,11 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
             </div>
 
             <h2 className="text-xl font-extrabold text-neutral-100 mb-2 leading-tight tracking-tight relative z-10 text-left px-4">
-                {result.synergy_title || "Новая Возможность"}
+                {typeof result.synergy_title === 'object' ? JSON.stringify(result.synergy_title) : (result.synergy_title || "Новая Возможность")}
             </h2>
 
             <p className="text-sm text-neutral-400 mb-6 leading-relaxed relative z-10 text-left opacity-80 px-2 italic">
-                {result.synergy_description || result.hypothesis}
+                {typeof result.synergy_description === 'object' ? JSON.stringify(result.synergy_description) : (result.synergy_description || result.hypothesis)}
             </p>
 
             <div className="flex-1 relative z-10 space-y-4">
@@ -171,7 +171,7 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                 <div className="text-left mb-6 bg-neutral-950/30 p-3 rounded-xl border border-neutral-800/30">
                     <h3 className="text-[10px] uppercase font-black text-neutral-600 mb-1 tracking-widest">Стратегическая логика</h3>
                     <p className="text-xs text-neutral-300 leading-relaxed italic">
-                        {result.logic_chain}
+                        {typeof result.logic_chain === 'object' ? JSON.stringify(result.logic_chain) : result.logic_chain}
                     </p>
                 </div>
 
@@ -180,17 +180,19 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                     <div className="space-y-3">
                         <div className="bg-purple-500/5 p-3 rounded-xl border border-purple-500/10">
                             <h3 className="text-[9px] uppercase font-black text-purple-400 mb-1 tracking-widest">MVP Сценарий</h3>
-                            <p className="text-[11px] text-neutral-400 leading-tight">{result.mvp_scenario}</p>
+                            <p className="text-[11px] text-neutral-400 leading-tight">
+                                {typeof result.mvp_scenario === 'object' ? JSON.stringify(result.mvp_scenario) : result.mvp_scenario}
+                            </p>
                         </div>
 
                         {result.defensibility && (
                             <div className="bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
                                 <h3 className="text-[9px] uppercase font-black text-blue-400 mb-1 tracking-widest">Защита бизнеса</h3>
                                 <p className="text-[11px] text-neutral-400 leading-tight mb-1">
-                                    <span className="text-blue-300/50">Moat:</span> {result.defensibility.competitive_moat}
+                                    <span className="text-blue-300/50">Moat:</span> {typeof result.defensibility.competitive_moat === 'object' ? JSON.stringify(result.defensibility.competitive_moat) : result.defensibility.competitive_moat}
                                 </p>
                                 <p className="text-[11px] text-neutral-400 leading-tight">
-                                    <span className="text-blue-300/50">Adv:</span> {result.defensibility.unfair_advantage}
+                                    <span className="text-blue-300/50">Adv:</span> {typeof result.defensibility.unfair_advantage === 'object' ? JSON.stringify(result.defensibility.unfair_advantage) : result.defensibility.unfair_advantage}
                                 </p>
                             </div>
                         )}
@@ -202,14 +204,14 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                     <div className="grid grid-cols-2 gap-2 mt-4">
                         <div className="bg-neutral-950/50 p-2 rounded-lg border border-neutral-800/50">
                             <span className="text-[8px] text-neutral-600 block mb-1 uppercase font-bold">ERRC (Blue Ocean)</span>
-                            <span className="text-[9px] text-neutral-400 block leading-tight truncate" title={result.thinking_models.blue_ocean_errc}>
-                                {result.thinking_models.blue_ocean_errc || result.thinking_models.scamper}
+                            <span className="text-[9px] text-neutral-400 block leading-tight truncate" title={String(result.thinking_models.blue_ocean_errc)}>
+                                {typeof result.thinking_models.blue_ocean_errc === 'object' ? '...' : (result.thinking_models.blue_ocean_errc || result.thinking_models.scamper)}
                             </span>
                         </div>
                         <div className="bg-neutral-950/50 p-2 rounded-lg border border-neutral-800/50">
                             <span className="text-[8px] text-neutral-600 block mb-1 uppercase font-bold">JTBD (Target Task)</span>
-                            <span className="text-[9px] text-neutral-400 block leading-tight truncate" title={result.thinking_models.jobs_to_be_done}>
-                                {result.thinking_models.jobs_to_be_done || result.thinking_models.analogy_bridge}
+                            <span className="text-[9px] text-neutral-400 block leading-tight truncate" title={String(result.thinking_models.jobs_to_be_done)}>
+                                {typeof result.thinking_models.jobs_to_be_done === 'object' ? '...' : (result.thinking_models.jobs_to_be_done || result.thinking_models.analogy_bridge)}
                             </span>
                         </div>
                     </div>
