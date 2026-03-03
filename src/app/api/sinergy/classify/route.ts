@@ -86,8 +86,8 @@ export async function POST(req: NextRequest) {
             .from('ideas')
             .select('id')
             .eq('title', title)
-            .eq('source', 'user')
-            .single()
+            .eq('source', source || 'user')
+            .maybeSingle()
 
         if (existing) {
             return NextResponse.json(existing) // Return existing instead of creating new
