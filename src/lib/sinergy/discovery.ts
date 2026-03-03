@@ -43,11 +43,17 @@ export async function fetchAndStoreFeed() {
         
         Focus on: Solopreneurship, Bootstrapping, Indie Hacking, AI-agents, Micro-SaaS gems.
         
-        ЗАПРЕЩЕНО (ИСКЛЮЧАЙ): новости налогов, законов РФ, господдержки, вебинары, курсы, "поддержка бизнеса", общие советы.
-        НАМ НЕ НУЖНЫ корпоративные новости или новости госсектора.
+        ЗАПРЕЩЕНО (ИСКЛЮЧАЙ СРАЗУ): 
+        - Анонсы новых ИИ-моделей (OpenAI, Google) или новых фич (генерация видео из фото и т.д).
+        - Любые курсы, обучение, вебинары, марафоны по заработку.
+        - Новости налогов, законов РФ, господдержки.
+        - Корпоративные новости или новости госсектора.
+        - Инструменты исключительно для развлечения/мемов.
+        
+        We need REAL STARTUPS and APPLIED BUSINESS IDEAS.
         
         Output MUST be Valid JSON Array: 
-        [{ "title": "Заголовок", "summary": "Детальное описание (3-5 предложений) о пользе и монетизации", "url": "...", "source": "Indie Hackers" }]
+        [{ "title": "Название стартапа/идеи", "summary": "Детальное описание бизнес-модели, кто платит и за что", "url": "...", "source": "Indie Hackers" }]
         ALL TEXT IN RUSSIAN.
     `;
 
@@ -94,10 +100,12 @@ export async function fetchAndStoreFeed() {
     try {
         const { data: channels } = await supabase.from('channels').select('*');
         if (channels && channels.length > 0) {
+            const TAGS = ['стартап', 'startup', 'идея', 'saas', 'инструмент', 'проект', 'сервис'];
             const scanQueue = channels.sort(() => 0.5 - Math.random()).slice(0, 3);
             for (const ch of scanQueue) {
                 try {
-                    await processManualUrl(ch.url);
+                    const tag = TAGS[Math.floor(Math.random() * TAGS.length)];
+                    await processManualUrl(ch.url, tag);
                     await supabase.from('channels').update({ last_scanned_at: new Date().toISOString() }).eq('id', ch.id);
                 } catch (chErr) {
                     console.error(`Failed channel ${ch.url}:`, chErr);

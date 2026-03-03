@@ -24,8 +24,8 @@ export function extractTelegramInfo(url: string): { handle: string; messageId?: 
     return null;
 }
 
-export async function getRecentTelegramPosts(handle: string, limit: number = 10): Promise<TelegramPostDetails[]> {
-    const url = `https://t.me/s/${handle}`;
+export async function getRecentTelegramPosts(handle: string, limit: number = 10, query?: string): Promise<TelegramPostDetails[]> {
+    const url = query ? `https://t.me/s/${handle}?q=${encodeURIComponent(query)}` : `https://t.me/s/${handle}`;
     try {
         const response = await fetch(url, {
             headers: {
