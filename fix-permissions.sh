@@ -1,39 +1,51 @@
 #!/bin/bash
 
-# Fix Permissions Script for macOS EPERM issues
-# Run this script to reclaim ownership of your project files and reset npm cache.
+# Nuclear Permission Fix for macOS EPERM issues
+# This script reclaims ownership, clears attributes, and resets the environment.
 
-echo "🔒 Starting Permission Fix..."
+echo "🚀 Starting NUCLEAR Permission Fix..."
 
-# 1. Get current user and group
 USER_NAME=$(whoami)
 GROUP_NAME=$(id -gn)
 
-echo "👤 Fixing ownership for user: $USER_NAME:$GROUP_NAME"
+echo "👤 User: $USER_NAME, Group: $GROUP_NAME"
 
-# 2. Reclaim ownership of the entire project directory (recursive)
-# This fixes cases where files were created with 'sudo'
+# 1. Reclaim ownership of EVERYTHING in the project
+echo "🛠 Reclaiming project ownership..."
 sudo chown -R $USER_NAME:$GROUP_NAME .
 
-echo "✅ Ownership fixed."
+# 2. Remove macOS Extended Attributes (@ signs in ls -l)
+echo "🛠 Removing macOS extended attributes..."
+sudo xattr -rc .
 
-# 3. Aggressive Clean
-echo "🧹 Cleaning project artifacts..."
-rm -rf node_modules
-rm -rf .next
-rm -rf .swc
-rm -rf package-lock.json
+# 3. Reset Permissions (Directories to 755, Files to 644)
+echo "🛠 Resetting file permissions..."
+find . -type d -exec sudo chmod 755 {} +
+find . -type f -exec sudo chmod 644 {} +
+# Make scripts executable again
+chmod +x scripts/*.sh 2>/dev/null
+chmod +x *.sh 2>/dev/null
 
-echo "✅ Clean complete."
+# 4. Fix Global npm permissions (often the root cause of EPERM)
+echo "🛠 Fixing global npm cache permissions..."
+sudo chown -R $USER_NAME:$GROUP_NAME ~/.npm
 
-# 4. Clean npm cache (force)
-echo "🧹 Cleaning global npm cache..."
+# 5. Destroy corrupted artifacts
+echo "🧹 NUKING node_modules and cache..."
+sudo rm -rf node_modules
+sudo rm -rf .next
+sudo rm -rf .swc
+sudo rm -rf package-lock.json
+
+# 6. Clean npm cache (force)
+echo "🧹 Forcing npm cache clean..."
 npm cache clean --force
 
-echo "✅ Cache cleaned."
+echo "✅ Environment is clean."
 
-# 5. Reinstall dependencies
-echo "📦 Reinstalling dependencies..."
+# 7. Reinstall dependencies
+echo "📦 Reinstalling dependencies (Fresh start)..."
 npm install
 
-echo "🎉 DONE! Try running 'npm run build' now."
+echo "🎉 DONE! Permissions reset and dependencies reinstalled."
+echo "👉 Now try: npm run lint"
