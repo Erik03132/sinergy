@@ -114,11 +114,20 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(analysisWithStatus)
 
-    } catch (error: any) {
-        console.error('Analysis API Error:', error)
+    } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown error'
+        console.error('Analysis API Error:', message)
+
+        // Понятное сообщение для пользователя (не технический текст)
+        const userMessage = message.includes('GEMINI_API_KEY')
+            ? 'AI недоступен: не настроен API ключ.'
+            : message.includes('временно недоступен') || message.includes('Offline')
+                ? 'AI временно недоступен. Попробуйте через несколько минут.'
+                : 'Не удалось сгенерировать анализ. Попробуйте ещё раз.'
+
         return NextResponse.json({
-            error: 'Internal Server Error',
-            details: error.message || 'Unknown error'
+            error: 'Analysis failed',
+            details: userMessage
         }, { status: 500 })
     }
 }

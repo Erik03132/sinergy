@@ -7,11 +7,6 @@ import { askMoonshot } from './moonshot'
 import { askDeepSeek } from './deepseek'
 import { askOpenRouter } from './openrouter'
 
-interface GeminiMessage {
-    role: 'user' | 'model'
-    parts: Array<{ text: string }>
-}
-
 interface GeminiResponse {
     candidates: Array<{ content: { parts: Array<{ text: string }> } }>
 }
@@ -19,14 +14,15 @@ interface GeminiResponse {
 const MODELS = [
     'gemini-2.0-flash',       // Primary: Fastest & most reliable
     'gemini-2.0-flash-lite',  // Fallback 1: Lightweight
-    'openrouter',             // Fallback 2: High availability
-    'moonshot',               // Fallback 3: Moonshot (Kimi) - valid key available
-    'deepseek'                // Fallback 4: DeepSeek
+    'gemini-1.5-flash',       // Fallback 2: Older but stable
+    'openrouter',             // Fallback 3: OpenRouter
+    'moonshot',               // Fallback 4: Moonshot (Kimi)
+    'deepseek'                // Fallback 5: DeepSeek
 ]
 
 async function fetchGemini(model: string, apiKey: string, prompt: string, search: boolean = false) {
-    const body: any = {
-        contents: [{ role: 'user' as const, parts: [{ text: prompt }] }],
+    const body: Record<string, unknown> = {
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
     }
 
     if (search && model.startsWith('gemini')) {
@@ -58,78 +54,101 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
     const keys = [
         process.env.GEMINI_API_KEY,
         process.env.GEMINI_API_KEY_SECONDARY
-    ].filter(Boolean) as string[];
+    ].filter(Boolean) as string[]
 
     const { search = false } = options
     const errors: string[] = []
 
-    // We try models in sequence
     for (const model of MODELS) {
         try {
-            // Handle Gemini Models with Key cycling
+            // --- Gemini (Google) ---
             if (model.startsWith('gemini')) {
-                if (keys.length === 0) continue;
+                if (keys.length === 0) {
+                    errors.push('[gemini] GEMINI_API_KEY не задан')
+                    continue
+                }
 
                 for (const key of keys) {
-                    console.log(`🤖 Using Gemini (${model})${search ? ' + Search' : ''} [Key: ${key.slice(-4)}]...`)
+                    console.log(`🤖 Gemini (${model})${search ? ' + Search' : ''} [Key: ...${key.slice(-4)}]`)
                     const response = await fetchGemini(model, key, prompt, search)
 
                     if (response.ok) {
                         const data: GeminiResponse = await response.json()
-                        return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+                        if (text) return text
                     }
 
                     const errText = await response.text()
-                    console.warn(`⚠️ Gemini ${model} key ${key.slice(-4)} failed (${response.status}):`, errText)
-
-                    // If rate limited or 400 (Bad Gateway/Key) - try next key
-                    if (response.status === 429 || response.status === 503 || response.status === 400) {
-                        continue;
-                    }
+                    console.warn(`⚠️ Gemini ${model} [${key.slice(-4)}] failed (${response.status}):`, errText)
+                    errors.push(`[gemini:${model}] HTTP ${response.status}`)
                 }
-                // If both keys failed for this model, continue to next model/provider
-                continue;
+                continue
             }
 
-            // Handle OpenRouter
-            else if (model === 'openrouter') {
+            // --- OpenRouter ---
+            if (model === 'openrouter') {
+                if (!process.env.OPENROUTER_API_KEY) {
+                    console.log('⏭ OpenRouter: ключ не задан, пропускаем')
+                    continue
+                }
                 try {
+                    console.log('🤖 OpenRouter...')
                     return await askOpenRouter(prompt)
-                } catch (e: any) {
-                    console.warn('OpenRouter failed:', e.message)
-                    errors.push(`[openrouter] ${e.message}`)
-                    continue
+                } catch (e: unknown) {
+                    const msg = e instanceof Error ? e.message : String(e)
+                    console.warn('⚠️ OpenRouter failed:', msg)
+                    errors.push(`[openrouter] ${msg}`)
                 }
+                continue
             }
 
-            // Handle Moonshot (Kimi) - valid MOONSHOT_API_KEY in env
-            else if (model === 'moonshot') {
+            // --- Moonshot (Kimi) ---
+            if (model === 'moonshot') {
+                if (!process.env.MOONSHOT_API_KEY) {
+                    console.log('⏭ Moonshot: ключ не задан, пропускаем')
+                    continue
+                }
                 try {
+                    console.log('🤖 Moonshot...')
                     return await askMoonshot(prompt)
-                } catch (e: any) {
-                    console.warn('Moonshot failed:', e.message)
-                    errors.push(`[moonshot] ${e.message}`)
-                    continue
+                } catch (e: unknown) {
+                    const msg = e instanceof Error ? e.message : String(e)
+                    console.warn('⚠️ Moonshot failed:', msg)
+                    errors.push(`[moonshot] ${msg}`)
                 }
+                continue
             }
 
-            // Handle DeepSeek
-            else if (model === 'deepseek') {
+            // --- DeepSeek ---
+            if (model === 'deepseek') {
+                if (!process.env.DEEPSEEK_API_KEY) {
+                    console.log('⏭ DeepSeek: ключ не задан, пропускаем')
+                    continue
+                }
                 try {
+                    console.log('🤖 DeepSeek...')
                     return await askDeepSeek(prompt)
-                } catch (e: any) {
-                    console.warn('DeepSeek failed:', e.message)
-                    errors.push(`[deepseek] ${e.message}`)
-                    continue
+                } catch (e: unknown) {
+                    const msg = e instanceof Error ? e.message : String(e)
+                    console.warn('⚠️ DeepSeek failed:', msg)
+                    errors.push(`[deepseek] ${msg}`)
                 }
+                continue
             }
 
-        } catch (e: any) {
-            console.error(`❌ Provider error (${model}):`, e)
-            errors.push(`[${model}] ${e?.message || 'Unknown error'}`)
+        } catch (e: unknown) {
+            const msg = e instanceof Error ? e.message : String(e)
+            console.error(`❌ Провайдер (${model}) крашнулся:`, msg)
+            errors.push(`[${model}] ${msg}`)
             await delay(100)
         }
     }
 
-    throw new Error(`AI Offline. Details: ${errors.join(' | ')}`)
+    // Формируем понятное сообщение об ошибке
+    const hasGeminiKey = keys.length > 0
+    if (!hasGeminiKey) {
+        throw new Error('AI недоступен: не задан GEMINI_API_KEY. Обратитесь к администратору.')
+    }
+
+    throw new Error('AI временно недоступен. Все провайдеры не ответили. Попробуйте позже.')
 }
