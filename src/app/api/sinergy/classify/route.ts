@@ -10,8 +10,8 @@ import { z } from 'zod'
 export const runtime = 'nodejs'
 
 const classifySchema = z.object({
-    title: z.string().min(3),
-    description: z.string().min(10),
+    title: z.string().min(1, "Название не может быть пустым"),
+    description: z.string().min(1, "Описание не может быть пустым"),
     is_favorite: z.boolean().optional().default(false),
     source: z.enum(['user', 'synergy']).optional().default('user'),
     vertical: z.string().optional(),
