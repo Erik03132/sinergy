@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { SynergyResult } from '@/types/sinergy'
 import { Shuffle, Sparkles, ArrowRight, Loader2, Heart } from 'lucide-react'
 import { toast } from 'sonner'
@@ -84,12 +84,21 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
     const [isSaving, setIsSaving] = useState(false)
     const [localId, setLocalId] = useState<string | null>(result.idea_id || null)
 
-    const handleSaveIdea = async (silent = false) => {
-        if (isSaved && localId) return localId
+    // Ensure we track the id even if it was auto-saved by the backend
+    useEffect(() => {
+        if (result.idea_id && !localId) {
+            setLocalId(result.idea_id)
+        }
+    }, [result.idea_id, localId])
+
+    const handleSaveIdea = async (silent = false): Promise<string | null> => {
+        const currentId = localId || result.idea_id
+        if (isSaved && currentId) return currentId
+
         setIsSaving(true)
-        console.log('BlenderCard: Saving...', { savedId: localId || result.idea_id })
+        console.log('BlenderCard: Saving...', { currentId })
         try {
-            let savedId = localId || result.idea_id;
+            let savedId = currentId;
 
             if (savedId) {
                 const res = await fetch('/api/sinergy/ideas/favorite', {
@@ -97,34 +106,36 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: savedId, is_favorite: true }),
                 })
-                if (!res.ok) {
-                    const errData = await res.json().catch(() => ({}))
-                    console.error('BlenderCard: Favorite failed', errData)
-                    throw new Error('Ошибка при сохранении')
-                }
+                if (!res.ok) throw new Error('Ошибка при обновлении')
             } else {
-                // Fallback old behavior
                 const res = await fetch('/api/sinergy/classify', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        title: result.synergy_title || `Синергия: ${result.components?.[0].title} + ${result.components?.[1].title}`,
+                        title: result.synergy_title || "Новая Возможность",
                         description: result.synergy_description || result.hypothesis || "",
                         is_favorite: true,
                         source: 'synergy',
-                        ...result.classification
+                        ...result.classification,
+                        metadata: {
+                            logic_chain: result.logic_chain,
+                            scores: result.scores,
+                            ai_trend_forecast: result.ai_trend_forecast
+                        }
                     }),
                 })
-                if (!res.ok) throw new Error('Ошибка при сохранении')
+                if (!res.ok) throw new Error('Ошибка при классификации')
                 const data = await res.json()
-                savedId = data.id as string
-                setLocalId(savedId)
+                savedId = data.id
+                if (savedId) setLocalId(savedId)
             }
 
-            setIsSaved(true)
-            if (!silent) toast.success("Сохранено в Избранное!")
+            if (savedId) {
+                setIsSaved(true)
+                if (!silent) toast.success("Сохранено в Избранное!")
+            }
             return savedId
-        } catch (e) {
+        } catch (e: any) {
             console.error('BlenderCard: Save failed', e)
             if (!silent) toast.error("Не удалось сохранить.")
             return null
@@ -134,8 +145,8 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
     }
 
     const handleDetails = async () => {
-        const id = localId || result.idea_id
-        console.log('BlenderCard: handleDetails', { id })
+        const id = localId || result.idea_id || null
+        console.log('BlenderCard: handleDetails transition', { id })
 
         if (id) {
             router.push(`/sinergy/analysis/${id}`)
@@ -144,12 +155,11 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
 
         toast.info("Подготавливаем детальный анализ...")
         const savedId = await handleSaveIdea(true)
-        console.log('BlenderCard: handleDetails after save', { savedId })
 
         if (savedId) {
             router.push(`/sinergy/analysis/${savedId}`)
         } else {
-            toast.error("Не удалось подготовить анализ. Попробуйте еще раз.")
+            toast.error("Не удалось открыть анализ. Попробуйте еще раз.")
         }
     }
 
