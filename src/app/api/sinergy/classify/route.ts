@@ -65,6 +65,17 @@ export async function POST(req: NextRequest) {
                 const classificationRaw = await askGemini(prompt)
                 const cleanJson = classificationRaw.replace(/```json/g, '').replace(/```/g, '').trim()
                 classification = JSON.parse(cleanJson)
+
+                // Sanitize fields for DB constraints
+                const validBudgets = ['0-25k', '25k-50k', '50k-100k']
+                if (classification.budget_estimate && !validBudgets.includes(classification.budget_estimate)) {
+                    classification.budget_estimate = null
+                }
+
+                const validVerticals = ['HealthTech', 'EdTech', 'FinTech', 'ProductivityTools', 'AI-infrastructure', 'CleanTech', 'Logistics', 'Entertainment', 'Other']
+                if (classification.vertical && !validVerticals.includes(classification.vertical)) {
+                    classification.vertical = 'Other'
+                }
             } catch (aiError) {
                 console.warn('Gemini classification failed, using fallback:', aiError)
                 classification = {
@@ -119,8 +130,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json(data)
     } catch (error) {
         if (error instanceof z.ZodError) {
-            console.error('Validation Error:', error.errors)
-            return NextResponse.json({ error: error.errors }, { status: 400 })
+            const msg = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
+            return NextResponse.json({ error: `Ошибка валидации: ${msg}` }, { status: 400 })
         }
         console.error('API Error:', error)
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })

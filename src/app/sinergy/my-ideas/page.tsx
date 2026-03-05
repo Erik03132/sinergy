@@ -24,15 +24,18 @@ export default function MyIdeasPage() {
                 body: JSON.stringify({ title, description }),
             })
 
-            if (!res.ok) throw new Error('Failed to save idea')
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                throw new Error(err.error || 'Ошибка при сохранении')
+            }
 
-            toast.success('Idea added successfully!')
+            toast.success('Идея успешно сохранена!')
             setTitle('')
             setDescription('')
-            router.refresh()
-        } catch (error) {
+            router.push('/sinergy/archive')
+        } catch (error: any) {
             console.error(error)
-            toast.error('Something went wrong. Please try again.')
+            toast.error(error.message || 'Произошла ошибка. Попробуйте еще раз.')
         } finally {
             setIsLoading(false)
         }
