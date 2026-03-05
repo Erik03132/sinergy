@@ -6,7 +6,6 @@
 import { askMoonshot } from './moonshot'
 import { askDeepSeek } from './deepseek'
 import { askOpenRouter } from './openrouter'
-// import { askQwen } from './qwen'
 
 interface GeminiMessage {
     role: 'user' | 'model'
@@ -19,9 +18,10 @@ interface GeminiResponse {
 
 const MODELS = [
     'gemini-2.0-flash',       // Primary: Fastest & most reliable
-    'openrouter',             // Fallback 1: High availability
-    'gemini-2.0-flash-lite',  // Fallback 2: Lightweight
-    'deepseek'                // Fallback 3
+    'gemini-2.0-flash-lite',  // Fallback 1: Lightweight
+    'openrouter',             // Fallback 2: High availability
+    'moonshot',               // Fallback 3: Moonshot (Kimi) - valid key available
+    'deepseek'                // Fallback 4: DeepSeek
 ]
 
 async function fetchGemini(model: string, apiKey: string, prompt: string, search: boolean = false) {
@@ -95,8 +95,20 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
             else if (model === 'openrouter') {
                 try {
                     return await askOpenRouter(prompt)
-                } catch (e) {
-                    console.warn('OpenRouter failed, trying next...')
+                } catch (e: any) {
+                    console.warn('OpenRouter failed:', e.message)
+                    errors.push(`[openrouter] ${e.message}`)
+                    continue
+                }
+            }
+
+            // Handle Moonshot (Kimi) - valid MOONSHOT_API_KEY in env
+            else if (model === 'moonshot') {
+                try {
+                    return await askMoonshot(prompt)
+                } catch (e: any) {
+                    console.warn('Moonshot failed:', e.message)
+                    errors.push(`[moonshot] ${e.message}`)
                     continue
                 }
             }
@@ -105,8 +117,9 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
             else if (model === 'deepseek') {
                 try {
                     return await askDeepSeek(prompt)
-                } catch (e) {
-                    console.warn('DeepSeek failed, trying next...')
+                } catch (e: any) {
+                    console.warn('DeepSeek failed:', e.message)
+                    errors.push(`[deepseek] ${e.message}`)
                     continue
                 }
             }

@@ -223,18 +223,55 @@ export async function POST() {
               "anti_pattern_check": "Confirmation it is NOT generic"
             }`
 
-        const response = await askGemini(synthesisPrompt)
+        const response = await askGemini(synthesisPrompt).catch((err: any) => {
+            console.warn('⚠️ AI unavailable, using deterministic fallback:', err.message)
+            return null
+        })
+
         let synthesisResult: any = null
 
-        try {
-            const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-            synthesisResult = JSON.parse(cleaned)
-        } catch (e) {
-            console.error('JSON Parse error', e)
+        if (response) {
+            try {
+                const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
+                synthesisResult = JSON.parse(cleaned)
+            } catch (e) {
+                console.error('JSON Parse error', e)
+            }
         }
 
+        // === DETERMINISTIC FALLBACK — works without AI ===
         if (!synthesisResult) {
-            return NextResponse.json({ status: 'error', error: 'Generation failed' } as any, { status: 500 })
+            const techA = Array.isArray(a.core_tech) ? a.core_tech : ['AI']
+            const techB = b.core_tech ? (Array.isArray(b.core_tech) ? b.core_tech : ['Tech']) : ['AI']
+            const combinedTech = [...new Set([...techA, ...techB])]
+            const synTitle = `${a.title.split(' ').slice(0, 2).join(' ')} × ${b.title.split(' ').slice(0, 2).join(' ')}`
+            
+            synthesisResult = {
+                synergy_title: synTitle,
+                synergy_description: `Синергия бизнес-модели «${a.title}» и технологии «${b.title}». Объединение аудиторий и компетенций создаёт новую ценность для рынка.`,
+                mvp_scenario: `За 3 месяца: интегрировать ${techA[0] || 'API'} из идеи А с ключевым механизмом идеи Б. Запустить закрытое бета-тестирование с 50 клиентами.`,
+                logic_chain: `${a.title} обеспечивает спрос и клиентскую базу. ${b.title} добавляет технологическую глубину. Результат: продукт с уникальным сочетанием.`,
+                classification: {
+                    vertical: a.vertical || b.vertical || 'ProductivityTools',
+                    core_tech: combinedTech.slice(0, 4),
+                    target_audience: a.target_audience || b.target_audience || 'B2B-компании',
+                    business_model: a.business_model || 'SaaS'
+                },
+                thinking_models: {
+                    blue_ocean_errc: `Eliminate: сложная ручная интеграция. Create: автоматическая синергия двух рынков.`,
+                    knowledge_transfer: `Экспертиза из ${a.vertical || 'домена A'} применяется к задачам ${b.vertical || 'домена B'}.`,
+                    scamper: `Combine: объединить аудитории и технологии обеих идей.`,
+                    jobs_to_be_done: `Клиент хочет решить задачу без лишних шагов, используя лучшее из двух миров.`
+                },
+                defensibility: {
+                    competitive_moat: 'Сетевой эффект: чем больше пользователей, тем ценнее продукт.',
+                    unfair_advantage: `Уникальное сочетание: ${a.title} + ${b.title} = новый сегмент.`
+                },
+                ai_trend_forecast: 'ИИ усилит ключевые механизмы продукта: автоматизация, персонализация и предиктивный анализ станут основой дифференциации через 5 лет.',
+                contrarian_bet: 'Рынок недооценивает потенциал объединения этих двух ниш.',
+                anti_pattern_check: 'Продукт решает конкретную задачу конкретного сегмента, а не пытается быть универсальной платформой.',
+                _fallback: true
+            }
         }
 
         // Save to temporary synergies log
