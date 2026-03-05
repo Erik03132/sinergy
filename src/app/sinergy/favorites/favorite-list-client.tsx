@@ -10,6 +10,12 @@ export function FavoriteListClient({ initialIdeas }: { initialIdeas: Idea[] | nu
     const router = useRouter()
     const [ideas, setIdeas] = useState<Idea[]>(initialIdeas || [])
 
+    const sortedIdeas = React.useMemo(() => {
+        return [...ideas].sort((a, b) =>
+            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        )
+    }, [ideas])
+
     const handleCardClick = (id: string) => {
         router.push(`/sinergy/analysis/${id}`)
     }
@@ -64,7 +70,7 @@ export function FavoriteListClient({ initialIdeas }: { initialIdeas: Idea[] | nu
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {ideas.map((idea) => (
+            {sortedIdeas.map((idea) => (
                 <div
                     key={idea.id}
                     onClick={() => handleCardClick(idea.id)}
