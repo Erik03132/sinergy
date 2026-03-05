@@ -13,6 +13,9 @@ import { Idea, SynergyResult } from '@/types/sinergy'
 import { SYNERGY_BANNED_PATTERNS } from '@/lib/sinergy/constants'
 import { NextResponse } from 'next/server'
 
+export const runtime = 'nodejs'
+export const maxDuration = 60
+
 // Comprehensive Banned Patterns from constants
 const BANNED_PATTERNS = SYNERGY_BANNED_PATTERNS
 

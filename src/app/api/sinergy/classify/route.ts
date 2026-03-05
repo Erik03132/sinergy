@@ -6,8 +6,8 @@ import { Idea } from '@/types/sinergy'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 
-// Node.js runtime for full support of admin client and complex AI prompts
 export const runtime = 'nodejs'
+export const maxDuration = 60
 
 const classifySchema = z.object({
     title: z.string().min(1, "Название не может быть пустым"),

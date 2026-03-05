@@ -61,6 +61,7 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
     ].filter(Boolean) as string[];
 
     const { search = false } = options
+    const errors: string[] = []
 
     // We try models in sequence
     for (const model of MODELS) {
@@ -78,9 +79,11 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
                         return data.candidates?.[0]?.content?.parts?.[0]?.text || ''
                     }
 
+                    const errText = await response.text()
+                    console.warn(`⚠️ Gemini ${model} key ${key.slice(-4)} failed (${response.status}):`, errText)
+
                     // If rate limited or 400 (Bad Gateway/Key) - try next key
                     if (response.status === 429 || response.status === 503 || response.status === 400) {
-                        console.warn(`⚠️ ${model} key ${key.slice(-4)} issue (${response.status}). Trying next key...`)
                         continue;
                     }
                 }
@@ -108,11 +111,12 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
                 }
             }
 
-        } catch (e) {
+        } catch (e: any) {
             console.error(`❌ Provider error (${model}):`, e)
+            errors.push(`[${model}] ${e?.message || 'Unknown error'}`)
             await delay(100)
         }
     }
 
-    throw new Error('All AI providers and keys failed. Synergy system is offline.')
+    throw new Error(`AI Offline. Details: ${errors.join(' | ')}`)
 }
