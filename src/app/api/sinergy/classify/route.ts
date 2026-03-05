@@ -76,6 +76,12 @@ export async function POST(req: NextRequest) {
                 if (classification.vertical && !validVerticals.includes(classification.vertical)) {
                     classification.vertical = 'Other'
                 }
+
+                // Ensure array fields are actually arrays to satisfy DB schema
+                classification.core_tech = Array.isArray(classification.core_tech) ? classification.core_tech.map(String) : []
+                classification.pain_point = Array.isArray(classification.pain_point) ? classification.pain_point.map(String) : []
+                classification.tags = Array.isArray(classification.tags) ? classification.tags.map(String) : []
+
             } catch (aiError) {
                 console.warn('Gemini classification failed, using fallback:', aiError)
                 classification = {
@@ -92,6 +98,9 @@ export async function POST(req: NextRequest) {
         }
 
         const supabase = createAdminClient()
+        if (!supabase) {
+            return NextResponse.json({ error: 'Database configuration error (Admin Client)' }, { status: 500 })
+        }
 
         // Check for duplicates
         const { data: existing } = await supabase
