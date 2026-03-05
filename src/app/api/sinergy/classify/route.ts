@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
             .maybeSingle()
 
         if (existing) {
+            console.log(`ℹ️ Idea already exists: ${existing.id}`)
             return NextResponse.json(existing) // Return existing instead of creating new
         }
 
@@ -101,6 +102,7 @@ export async function POST(req: NextRequest) {
             ...classification,
         }
 
+        console.log(`💾 Saving new idea to database...`)
         const { data, error } = await supabase
             .from('ideas')
             .insert(newIdea)
@@ -108,10 +110,11 @@ export async function POST(req: NextRequest) {
             .single()
 
         if (error) {
-            console.error('Supabase error:', error)
-            return NextResponse.json({ error: 'Failed to save idea' }, { status: 500 })
+            console.error('❌ Supabase error:', error)
+            return NextResponse.json({ error: `Failed to save idea: ${error.message}` }, { status: 500 })
         }
 
+        console.log(`✅ Idea saved successfully: ${data.id}`)
         return NextResponse.json(data)
     } catch (error) {
         if (error instanceof z.ZodError) {
