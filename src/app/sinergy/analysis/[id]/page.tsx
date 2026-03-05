@@ -74,7 +74,10 @@ export default function AnalysisPage() {
                 })
             })
 
-            if (!res.ok) throw new Error('Analysis failed')
+            if (!res.ok) {
+                const errData = await res.json().catch(() => ({}))
+                throw new Error(errData.details || errData.error || 'Analysis failed')
+            }
 
             const data: DetailedAnalysis = await res.json()
             setAnalysis(data)
@@ -97,10 +100,10 @@ export default function AnalysisPage() {
             toast.success(additionalContext ? 'Анализ обновлен!' : 'Анализ завершен!')
             setUserThoughts('') // Clear input after success
             setHasInitializedThoughts(true) // Mark as initialized so metadata update doesn't restore it
-        } catch (error) {
-            console.error(error)
-            setError('Не удалось сгенерировать анализ. Попробуйте нажать кнопку повтора.')
-            toast.error('Ошибка генерации стратегии.')
+        } catch (error: any) {
+            console.error('Full analysis error:', error)
+            setError(error.message || 'Не удалось сгенерировать анализ. Попробуйте нажать кнопку повтора.')
+            toast.error(error.message || 'Ошибка генерации стратегии.')
         } finally {
             setIsAnalyzing(false)
         }
