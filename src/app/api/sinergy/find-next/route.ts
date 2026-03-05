@@ -1,5 +1,6 @@
 import { askGemini } from '@/lib/ai/gemini'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
     calculateConsensusSynergyScore,
     calculatePairCreativityScore,
@@ -253,6 +254,7 @@ export async function POST() {
         })
 
         // Automatically save to the 'ideas' table (Archive) 
+        const adminSupabase = createAdminClient()
         const classification = synthesisResult.classification || {}
 
         const safeString = (val: any, fallback: string) => {
@@ -298,9 +300,14 @@ export async function POST() {
 
         let idea_id = null
         try {
-            const { data: savedIdea, error } = await supabase.from('ideas').insert(newIdea).select('id').maybeSingle()
-            if (error) {
-                console.error("Supabase Insert Error for synergy:", error);
+            const { data: savedIdea, error: insertError } = await adminSupabase
+                .from('ideas')
+                .insert(newIdea)
+                .select('id')
+                .single()
+
+            if (insertError) {
+                console.error("Supabase Insert Error for synergy:", insertError);
             } else if (savedIdea) {
                 idea_id = savedIdea.id
             }
