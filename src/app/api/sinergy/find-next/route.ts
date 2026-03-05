@@ -182,11 +182,13 @@ export async function POST() {
             ✅ REQUIRED: Конкретный механизм работы с техническими деталями (на Русском)
             ✅ REQUIRED: Ясная ценность для конкретного сегмента клиентов
             ✅ REQUIRED: Защищаемое конкурентное преимущество (network effect, data moat, или unique tech)
+            ✅ REQUIRED: Обязательно учитывайте стремительное развитие ИИ. Как искусственный интеллект повлияет на этот бизнес через 5 лет? Убьет ли он его (заменит микро/малый бизнес) или, наоборот, станет драйвером роста?
             
             QUALITY CHECKLIST:
             - Проходит ли "бабушкин тест"?
             - Есть ли конкретный "jobs to be done" для клиента?
             - Можно ли построить MVP за 3 месяца с бюджетом $50K?
+            - Реалистичен ли бизнес с учетом трендов развития ИИ на горизонте 5 лет?
             
             Language: RUSSIAN (Русский). Output technical terms in English when appropriate.
 
@@ -212,6 +214,7 @@ export async function POST() {
                 "competitive_moat": "How to prevent copying",
                 "unfair_advantage": "Unique advantage"
               },
+              "ai_trend_forecast": "Прогноз на 5 лет: как развитие ИИ повлияет на этот бизнес (умрет или вырастет).",
               "contrarian_bet": "Unpopular opinion behind the product",
               "anti_pattern_check": "Confirmation it is NOT generic"
             }`
@@ -244,7 +247,8 @@ export async function POST() {
                 contrarian_bet: synthesisResult.contrarian_bet,
                 scores: scores,
                 defensibility: synthesisResult.defensibility,
-                mvp_scenario: synthesisResult.mvp_scenario
+                mvp_scenario: synthesisResult.mvp_scenario,
+                ai_trend_forecast: synthesisResult.ai_trend_forecast
             }
         })
 
@@ -287,7 +291,8 @@ export async function POST() {
                 score: scores.total,
                 mode: modeTitle,
                 components: [a, b],
-                is_auto_saved: true
+                is_auto_saved: true,
+                ai_trend_forecast: synthesisResult.ai_trend_forecast
             }
         }
 

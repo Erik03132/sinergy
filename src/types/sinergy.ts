@@ -79,6 +79,7 @@ export interface SynergyResult {
     competitive_moat: string;
     unfair_advantage: string;
   };
+  ai_trend_forecast?: string;
   anti_pattern_check?: string;
   scores?: {
     total: number;

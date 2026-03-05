@@ -69,7 +69,7 @@ export default function BlenderPage() {
                 {results.length > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 h-full pb-20">
                         {results.map((res, idx) => (
-                            <BlenderCard key={idx} result={res} index={idx} />
+                            <BlenderCard key={res.idea_id || idx} result={res} index={idx} />
                         ))}
                     </div>
                 )}
@@ -82,12 +82,13 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
     const router = useRouter()
     const [isSaved, setIsSaved] = useState(false)
     const [isSaving, setIsSaving] = useState(false)
+    const [localId, setLocalId] = useState<string | null>(result.idea_id || null)
 
     const handleSaveIdea = async (silent = false) => {
-        if (isSaved) return null
+        if (isSaved && localId) return localId
         setIsSaving(true)
         try {
-            let savedId = result.idea_id;
+            let savedId = localId || result.idea_id;
 
             if (savedId) {
                 const res = await fetch('/api/sinergy/ideas/favorite', {
@@ -112,6 +113,7 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                 if (!res.ok) throw new Error('Ошибка при сохранении')
                 const data = await res.json()
                 savedId = data.id as string
+                setLocalId(savedId)
             }
 
             setIsSaved(true)
@@ -126,6 +128,11 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
     }
 
     const handleDetails = async () => {
+        if (localId || result.idea_id) {
+            router.push(`/sinergy/analysis/${localId || result.idea_id}`)
+            return
+        }
+
         toast.info("Подготавливаем детальный анализ...")
         const id = await handleSaveIdea(true)
         if (id) {
@@ -184,6 +191,15 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                                 {typeof result.mvp_scenario === 'object' ? JSON.stringify(result.mvp_scenario) : result.mvp_scenario}
                             </p>
                         </div>
+
+                        {result.ai_trend_forecast && (
+                            <div className="bg-emerald-500/5 p-3 rounded-xl border border-emerald-500/10">
+                                <h3 className="text-[9px] uppercase font-black text-emerald-400 mb-1 tracking-widest">Прогноз ИИ (5 лет)</h3>
+                                <p className="text-[11px] text-neutral-400 leading-tight">
+                                    {typeof result.ai_trend_forecast === 'object' ? JSON.stringify(result.ai_trend_forecast) : result.ai_trend_forecast}
+                                </p>
+                            </div>
+                        )}
 
                         {result.defensibility && (
                             <div className="bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
