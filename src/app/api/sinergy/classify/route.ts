@@ -137,12 +137,17 @@ export async function POST(req: NextRequest) {
 
         console.log(`✅ Idea saved successfully: ${data.id}`)
         return NextResponse.json(data)
-    } catch (error) {
+    } catch (error: any) {
         if (error instanceof z.ZodError) {
             const msg = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
             return NextResponse.json({ error: `Ошибка валидации: ${msg}` }, { status: 400 })
         }
         console.error('API Error:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        // Expose error message for easier debugging in production
+        return NextResponse.json({
+            error: 'Internal Server Error',
+            details: error.message || 'Unknown error',
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }, { status: 500 })
     }
 }

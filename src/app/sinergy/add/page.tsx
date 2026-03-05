@@ -26,7 +26,8 @@ export default function AddIdeaPage() {
 
             if (!res.ok) {
                 const err = await res.json().catch(() => ({}))
-                throw new Error(err.error || 'Ошибка при сохранении')
+                const errorMessage = err.details ? `${err.error}: ${err.details}` : (err.error || 'Ошибка при сохранении')
+                throw new Error(errorMessage)
             }
 
             toast.success("Идея добавлена и отправлена в Архив!")
