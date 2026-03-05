@@ -1,5 +1,6 @@
 
 import { askGemini } from '@/lib/ai/gemini'
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Idea } from '@/types/sinergy'
 import { NextRequest, NextResponse } from 'next/server'
@@ -97,9 +98,15 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        const supabase = createAdminClient()
+        let supabase = createAdminClient()
+
         if (!supabase) {
-            return NextResponse.json({ error: 'Database configuration error (Admin Client)' }, { status: 500 })
+            console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY is missing. Falling back to standard client. Note: This may fail if RLS policies are strict.')
+            supabase = await createClient()
+        }
+
+        if (!supabase) {
+            return NextResponse.json({ error: 'Database configuration error (No Client Available)' }, { status: 500 })
         }
 
         // Check for duplicates

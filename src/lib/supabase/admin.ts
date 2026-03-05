@@ -5,8 +5,8 @@ export function createAdminClient() {
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
     if (!serviceRoleKey || serviceRoleKey === 'your_service_role_key_here') {
-        console.error('SUPABASE_SERVICE_ROLE_KEY is missing or invalid')
-        throw new Error('Server Configuration Error: Missing Service Role Key')
+        console.warn('SUPABASE_SERVICE_ROLE_KEY is missing or invalid. Admin features will be disabled.')
+        return null
     }
 
     return createClient(supabaseUrl, serviceRoleKey, {

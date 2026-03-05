@@ -254,7 +254,11 @@ export async function POST() {
         })
 
         // Automatically save to the 'ideas' table (Archive) 
-        const adminSupabase = createAdminClient()
+        let adminSupabase = createAdminClient()
+        if (!adminSupabase) {
+            console.warn('⚠️ Missing admin client in find-next, falling back to standard client')
+            adminSupabase = await createClient()
+        }
         const classification = synthesisResult.classification || {}
 
         const safeString = (val: any, fallback: string) => {
