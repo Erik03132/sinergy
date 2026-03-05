@@ -87,6 +87,7 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
     const handleSaveIdea = async (silent = false) => {
         if (isSaved && localId) return localId
         setIsSaving(true)
+        console.log('BlenderCard: Saving...', { savedId: localId || result.idea_id })
         try {
             let savedId = localId || result.idea_id;
 
@@ -96,7 +97,11 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ id: savedId, is_favorite: true }),
                 })
-                if (!res.ok) throw new Error('Ошибка при сохранении')
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}))
+                    console.error('BlenderCard: Favorite failed', errData)
+                    throw new Error('Ошибка при сохранении')
+                }
             } else {
                 // Fallback old behavior
                 const res = await fetch('/api/sinergy/classify', {
@@ -120,6 +125,7 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
             if (!silent) toast.success("Сохранено в Избранное!")
             return savedId
         } catch (e) {
+            console.error('BlenderCard: Save failed', e)
             if (!silent) toast.error("Не удалось сохранить.")
             return null
         } finally {
@@ -128,15 +134,22 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
     }
 
     const handleDetails = async () => {
-        if (localId || result.idea_id) {
-            router.push(`/sinergy/analysis/${localId || result.idea_id}`)
+        const id = localId || result.idea_id
+        console.log('BlenderCard: handleDetails', { id })
+
+        if (id) {
+            router.push(`/sinergy/analysis/${id}`)
             return
         }
 
         toast.info("Подготавливаем детальный анализ...")
-        const id = await handleSaveIdea(true)
-        if (id) {
-            router.push(`/sinergy/analysis/${id}`)
+        const savedId = await handleSaveIdea(true)
+        console.log('BlenderCard: handleDetails after save', { savedId })
+
+        if (savedId) {
+            router.push(`/sinergy/analysis/${savedId}`)
+        } else {
+            toast.error("Не удалось подготовить анализ. Попробуйте еще раз.")
         }
     }
 
