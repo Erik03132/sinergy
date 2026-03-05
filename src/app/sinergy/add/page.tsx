@@ -24,15 +24,18 @@ export default function AddIdeaPage() {
                 body: JSON.stringify({ title, description }),
             })
 
-            if (!res.ok) throw new Error('Ошибка')
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}))
+                throw new Error(err.error || 'Ошибка при сохранении')
+            }
 
             toast.success("Идея добавлена и отправлена в Архив!")
             setTitle('')
             setDescription('')
             router.push('/sinergy/archive')
-        } catch (error) {
+        } catch (error: any) {
             console.error(error)
-            toast.error("Не удалось сохранить идею.")
+            toast.error(error.message || "Не удалось сохранить идею.")
         } finally {
             setIsSubmitting(false)
         }

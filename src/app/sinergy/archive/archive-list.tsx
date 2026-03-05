@@ -21,11 +21,13 @@ export function ArchiveList({ initialIdeas }: ArchiveListProps) {
     // Simplifying for now.
 
     const filteredIdeas = useMemo(() => {
-        return ideas.filter(idea => {
-            // Search text
-            const searchContent = `${idea.title} ${idea.description} ${idea.vertical} ${idea.business_model || ''}`.toLowerCase()
-            return searchContent.includes(searchQuery.toLowerCase())
-        })
+        return [...ideas]
+            .filter(idea => {
+                // Search text
+                const searchContent = `${idea.title} ${idea.description} ${idea.vertical} ${idea.business_model || ''}`.toLowerCase()
+                return searchContent.includes(searchQuery.toLowerCase())
+            })
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }, [ideas, searchQuery])
 
     const handleCardClick = (id: string) => {
