@@ -1,10 +1,8 @@
 /**
- * Google Gemini API клиент + Multi-Provider Fallback (The "Brain")
- * Документация: https://ai.google.dev
+ * AI клиент с каскадным fallback.
+ * Primary: OpenRouter (DeepSeek V3, дешёвый)  →  Fallback: Gemini (если ключ есть)
  */
 
-import { askMoonshot } from './moonshot'
-import { askDeepSeek } from './deepseek'
 import { askOpenRouter } from './openrouter'
 
 interface GeminiResponse {
@@ -12,12 +10,9 @@ interface GeminiResponse {
 }
 
 const MODELS = [
-    'gemini-2.0-flash',       // Primary: Fastest & most reliable
-    'gemini-2.0-flash-lite',  // Fallback 1: Lightweight
-    'gemini-1.5-flash',       // Fallback 2: Older but stable
-    'openrouter',             // Fallback 3: OpenRouter
-    'moonshot',               // Fallback 4: Moonshot (Kimi)
-    'deepseek'                // Fallback 5: DeepSeek
+    'openrouter',             // Primary: OpenRouter (DeepSeek V3, $0)
+    'gemini-2.0-flash',       // Fallback 1: Gemini (если ключ есть)
+    'gemini-2.0-flash-lite',  // Fallback 2: Lightweight
 ]
 
 async function fetchGemini(model: string, apiKey: string, prompt: string, search: boolean = false) {
@@ -98,40 +93,6 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
                     const msg = e instanceof Error ? e.message : String(e)
                     console.warn('⚠️ OpenRouter failed:', msg)
                     errors.push(`[openrouter] ${msg}`)
-                }
-                continue
-            }
-
-            // --- Moonshot (Kimi) ---
-            if (model === 'moonshot') {
-                if (!process.env.MOONSHOT_API_KEY) {
-                    console.log('⏭ Moonshot: ключ не задан, пропускаем')
-                    continue
-                }
-                try {
-                    console.log('🤖 Moonshot...')
-                    return await askMoonshot(prompt)
-                } catch (e: unknown) {
-                    const msg = e instanceof Error ? e.message : String(e)
-                    console.warn('⚠️ Moonshot failed:', msg)
-                    errors.push(`[moonshot] ${msg}`)
-                }
-                continue
-            }
-
-            // --- DeepSeek ---
-            if (model === 'deepseek') {
-                if (!process.env.DEEPSEEK_API_KEY) {
-                    console.log('⏭ DeepSeek: ключ не задан, пропускаем')
-                    continue
-                }
-                try {
-                    console.log('🤖 DeepSeek...')
-                    return await askDeepSeek(prompt)
-                } catch (e: unknown) {
-                    const msg = e instanceof Error ? e.message : String(e)
-                    console.warn('⚠️ DeepSeek failed:', msg)
-                    errors.push(`[deepseek] ${msg}`)
                 }
                 continue
             }

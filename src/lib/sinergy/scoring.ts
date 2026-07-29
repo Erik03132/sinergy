@@ -186,14 +186,27 @@ export function calculateKnowledgeTransferScore(a: Idea, b: Idea): number {
 // --- LEGACY/COMPATIBILITY FUNCTIONS ---
 
 export function calculateSynergyScore(a: Idea, b: Idea): { score: number; breakdown: SynergyScoreBreakdown } {
-    const score = calculateConsensusSynergyScore(a, b)
+    const consensus = calculateConsensusSynergyScore(a, b)
+    const creativity = calculatePairCreativityScore(a, b)
+    const blueOcean = calculateBlueOceanPotential(a, b)
+    const knowledgeTransfer = calculateKnowledgeTransferScore(a, b)
+
+    const techA = a.core_tech || []
+    const techB = (b as any).core_tech || []
+    const techScore = isTechSynergistic(techA, techB) ? Math.min(consensus * 1.2, 10) : consensus * 0.5
+
+    const audOverlap = overlapRatio(a.target_audience || '', b.target_audience || '')
+    const audScore = audOverlap * 10
+
+    const bizSynergy = a.business_model === b.business_model ? 8 : 5
+
     return {
-        score,
+        score: consensus,
         breakdown: {
-            tech: Math.round(score * 0.4),
-            audience: Math.round(score * 0.3),
-            business: Math.round(score * 0.2),
-            temporal: 1
+            tech: Math.round(techScore * 10) / 10,
+            audience: Math.round(audScore * 10) / 10,
+            business: Math.round(bizSynergy * 10) / 10,
+            temporal: Math.round(Math.min(creativity, 10))
         }
     }
 }

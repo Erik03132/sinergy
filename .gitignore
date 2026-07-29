@@ -1,32 +1,26 @@
-# dependencies
-/node_modules
-/.pnp
-.pnp.*
-.yarn/install-state.gz
-
-# testing
-/coverage
-
-# next.js
-/.next/
-/out/
-
-# production
-/build
-
-# misc
-.DS_Store
-*.pem
 
 # debug
-npm-debug.log*
-
+# dependencies
 # env files (secrets!)
-.env*.local
-
-# vercel
-.vercel
-
+# misc
+# next.js
+# production
+# testing
 # typescript
+# vercel
+*.pem
 *.tsbuildinfo
+.DS_Store
+.env*.local
+.env.production
+.pnp.*
+.vercel
+.yarn/install-state.gz
+/.next/
+/.pnp
+/build
+/coverage
+/node_modules
+/out/
 next-env.d.ts
+npm-debug.log*

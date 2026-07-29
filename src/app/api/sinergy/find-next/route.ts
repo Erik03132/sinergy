@@ -1,378 +1,62 @@
-import { askGemini } from '@/lib/ai/gemini'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import {
-    calculateConsensusSynergyScore,
-    calculatePairCreativityScore,
-    calculateBlueOceanPotential,
-    calculateKnowledgeTransferScore,
-    sanityCheck,
-    isAntiPattern
-} from '@/lib/sinergy/scoring'
-import { Idea, SynergyResult } from '@/types/sinergy'
-import { SYNERGY_BANNED_PATTERNS } from '@/lib/sinergy/constants'
 import { NextResponse } from 'next/server'
+import { runBlender, saveSynergy, AgentMode } from '@/lib/sinergy/agents/orchestrator'
+import { SynergyResult } from '@/types/sinergy'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-// Comprehensive Banned Patterns from constants
-const BANNED_PATTERNS = SYNERGY_BANNED_PATTERNS
-
-// Advanced Catalysts with Domain Affinity
-const EVOLUTION_CATALYSTS = [
-    {
-        title: 'Agentic RAG with Memory',
-        description: 'ИИ-агент с долговременной памятью и контекстом пользователя.',
-        maturity: 8,
-        synergy_domains: ['EdTech', 'HealthTech', 'LegalTech', 'ProductivityTools']
-    },
-    {
-        title: 'Multi-Modal AI (Vision + Text + Voice)',
-        description: 'Обработка изображений, текста и голоса в едином потоке.',
-        maturity: 7,
-        synergy_domains: ['Healthcare', 'Education', 'E-commerce', 'Entertainment']
-    },
-    {
-        title: 'Autonomous Workflow Orchestration',
-        description: 'Самообучающаяся автоматизация бизнес-процессов через API.',
-        maturity: 6,
-        synergy_domains: ['FinTech', 'Operations', 'HR', 'Logistics']
-    },
-    {
-        title: 'Real-Time Personalization Engine',
-        description: 'Динамическая адаптация UX на основе поведенческих паттернов.',
-        maturity: 8,
-        synergy_domains: ['E-commerce', 'Media', 'SaaS', 'Marketing']
-    },
-    {
-        title: 'Blockchain-based Trust Layer',
-        description: 'Верифицируемая история изменений для критичных данных.',
-        maturity: 5,
-        synergy_domains: ['Healthcare', 'Supply Chain', 'Legal', 'FinTech']
-    },
-    {
-        title: 'Predictive Analytics with Causal AI',
-        description: 'Не только прогноз, но и объяснение причинно-следственных связей.',
-        maturity: 6,
-        synergy_domains: ['FinTech', 'Marketing', 'Operations', 'Analytics']
-    }
-]
-
-function pickRandomPairs<T>(items: T[], pairCount: number): Array<[T, T]> {
-    const n = items.length
-    const pairs: Array<[T, T]> = []
-    if (n < 2) return pairs
-
-    for (let k = 0; k < pairCount; k++) {
-        const i = Math.floor(Math.random() * n)
-        let j = Math.floor(Math.random() * n)
-        if (n > 1) {
-            while (j === i) j = Math.floor(Math.random() * n)
-        }
-        pairs.push([items[i], items[j]])
-    }
-    return pairs
-}
-
-export async function POST() {
+export async function POST(req: Request) {
     try {
         const supabase = await createClient()
-        const { data: ideas, error } = await supabase.from('ideas').select('*')
+        const body = await req.json().catch(() => ({}))
+        const mode: AgentMode = body.mode || (process.env.GEMINI_API_KEY ? 'full' : 'det-only')
+
+        const { data: ideas, error } = await supabase
+            .from('ideas')
+            .select('*')
+            .not('vertical', 'eq', 'History')
+            .order('created_at', { ascending: false })
+            .limit(500)
 
         if (error) {
             return NextResponse.json({ status: 'error', error: error.message } as any, { status: 500 })
         }
-
         if (!ideas || ideas.length === 0) {
             return NextResponse.json({ status: 'no_more_synergy' } as SynergyResult)
         }
 
-        // Adaptive mode selection
-        const isEvolutionMode = ideas.length < 3 || Math.random() > 0.4;
-        let a: Idea;
-        let b: any;
-        let modeTitle = "";
-        let scores = { total: 0, blue_ocean: 0, knowledge_transfer: 0 };
+        const results = await runBlender(ideas, { mode })
 
-        if (isEvolutionMode) {
-            modeTitle = "Strategic Evolution";
-            a = ideas[Math.floor(Math.random() * ideas.length)];
-
-            // Smart catalyst selection
-            const compatibleCatalysts = EVOLUTION_CATALYSTS.filter(cat =>
-                cat.synergy_domains.some(domain => a.vertical?.includes(domain))
-            );
-
-            const catalyst = compatibleCatalysts.length > 0
-                ? compatibleCatalysts[Math.floor(Math.random() * compatibleCatalysts.length)]
-                : EVOLUTION_CATALYSTS[Math.floor(Math.random() * EVOLUTION_CATALYSTS.length)];
-
-            b = {
-                ...catalyst,
-                id: `catalyst-${catalyst.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
-                core_tech: ['AI', 'Cloud', 'API'],
-                business_model: 'Technology Enhancement'
-            };
-
-            const domainMatch = catalyst.synergy_domains.includes(a.vertical || "") ? 2 : 0;
-            scores.total = (catalyst.maturity * 0.8) + domainMatch + (Math.random() * 1.5);
-            scores.knowledge_transfer = catalyst.maturity;
-            scores.blue_ocean = 5 + Math.random() * 3;
-        } else {
-            modeTitle = "Hybrid Synthesis";
-            const CANDIDATE_PAIRS = 120;
-            const candidates = pickRandomPairs<Idea>(ideas, CANDIDATE_PAIRS)
-            const scored = candidates
-                .map(([x, y]) => {
-                    if (!sanityCheck(x, y)) return null
-                    const consensus = calculateConsensusSynergyScore(x, y)
-                    const creativity = calculatePairCreativityScore(x, y)
-                    const blueOcean = calculateBlueOceanPotential(x, y)
-                    const knowledgeTransfer = calculateKnowledgeTransferScore(x, y)
-
-                    return {
-                        x, y,
-                        total: (consensus * 0.35) + (creativity * 0.25) + (blueOcean * 0.25) + (knowledgeTransfer * 0.15),
-                        consensus, creativity, blueOcean, knowledgeTransfer
-                    }
-                })
-                .filter(Boolean) as any[]
-
-            if (scored.length === 0) {
-                a = ideas[Math.floor(Math.random() * ideas.length)];
-                b = ideas[Math.floor(Math.random() * ideas.length)];
-                while (a.id === b.id) b = ideas[Math.floor(Math.random() * ideas.length)];
-                scores = { total: 5, blue_ocean: 3, knowledge_transfer: 3 };
-            } else {
-                scored.sort((x, y) => y.total - x.total)
-                const TOP_SLICE = Math.min(3, scored.length)
-                const pick = scored[Math.floor(Math.random() * TOP_SLICE)]
-                a = pick.x
-                b = pick.y
-                scores = {
-                    total: pick.total,
-                    blue_ocean: pick.blueOcean,
-                    knowledge_transfer: pick.knowledgeTransfer
-                }
-            }
+        if (results.length === 0 || results[0].status === 'no_more_synergy') {
+            return NextResponse.json({ status: 'no_more_synergy' } as SynergyResult)
         }
 
-        const synthesisPrompt = `
-            ROLE: You are a radical innovation strategist combining Blue Ocean Strategy, Knowledge-Based View, and Synergy Analysis.
-            MODE: ${modeTitle}
-            
-            CONTEXT:
-            Component A: ${a.title} — ${a.description}
-            Domain A: ${a.vertical} | Tech: ${a.core_tech?.join(', ')} | Audience: ${a.target_audience}
-            
-            ${modeTitle === "Strategic Evolution" ? `Tech Catalyst B` : `Component B`}: ${b.title} — ${b.description}
-            ${modeTitle !== "Strategic Evolution" ? `Domain B: ${b.vertical} | Tech: ${b.core_tech?.join(', ')} | Audience: ${b.target_audience}` : ''}
-            
-            STRATEGIC FRAMEWORKS TO APPLY:
-            1. Blue Ocean Strategy: Eliminate-Reduce-Raise-Create framework. Identify what to eliminate from red ocean competition.
-            2. Knowledge-Based View: How unique knowledge/capabilities transfer between A and B creates defensible competitive advantage.
-            3. SCAMPER (Substitute, Combine, Adapt, Modify, Put to other use, Eliminate, Reverse).
-            
-            SCORING CONTEXT:
-            Synergy Score: ${Math.round(scores.total)}/10
-            Blue Ocean Potential: ${Math.round(scores.blue_ocean)}/10
-            Knowledge Transfer: ${Math.round(scores.knowledge_transfer)}/10
-            
-            HARD CONSTRAINTS:
-            ❌ BANNED: ${BANNED_PATTERNS.join(', ')}
-            ❌ NO abstract "platforms", "ecosystems", "aggregators"
-            ❌ NO "Uber for X", "Tinder for Y" analogies
-            ✅ REQUIRED: Конкретный механизм работы с техническими деталями (на Русском)
-            ✅ REQUIRED: Ясная ценность для конкретного сегмента клиентов
-            ✅ REQUIRED: Защищаемое конкурентное преимущество (network effect, data moat, или unique tech)
-            ✅ REQUIRED: Обязательно учитывайте стремительное развитие ИИ. Как искусственный интеллект повлияет на этот бизнес через 5 лет? Убьет ли он его (заменит микро/малый бизнес) или, наоборот, станет драйвером роста?
-            
-            QUALITY CHECKLIST:
-            - Проходит ли "бабушкин тест"?
-            - Есть ли конкретный "jobs to be done" для клиента?
-            - Можно ли построить MVP за 3 месяца с бюджетом $50K?
-            - Реалистичен ли бизнес с учетом трендов развития ИИ на горизонте 5 лет?
-            
-            Language: RUSSIAN (Русский). Output technical terms in English when appropriate.
-
-            OUTPUT FORMAT (Strict JSON, NO markdown):
-            {
-              "synergy_title": "String (Product Name)",
-              "synergy_description": "2-3 sentences: what, how, who",
-              "mvp_scenario": "What to launch in 3 months",
-              "logic_chain": "A + B = C, because...",
-              "classification": { 
-                "vertical": "Specific niche", 
-                "core_tech": ["tech 1", "tech 2"],
-                "target_audience": "Detailed segment",
-                "business_model": "Monetization model"
-              },
-              "thinking_models": { 
-                "blue_ocean_errc": "ERRC analysis",
-                "knowledge_transfer": "KBV analysis",
-                "scamper": "SCAMPER application",
-                "jobs_to_be_done": "JTBD analysis"
-              },
-              "defensibility": {
-                "competitive_moat": "How to prevent copying",
-                "unfair_advantage": "Unique advantage"
-              },
-              "ai_trend_forecast": "Прогноз на 5 лет: как развитие ИИ повлияет на этот бизнес (умрет или вырастет).",
-              "contrarian_bet": "Unpopular opinion behind the product",
-              "anti_pattern_check": "Confirmation it is NOT generic"
-            }`
-
-        const response = await askGemini(synthesisPrompt).catch((err: any) => {
-            console.warn('⚠️ AI unavailable, using deterministic fallback:', err.message)
-            return null
-        })
-
-        let synthesisResult: any = null
-
-        if (response) {
-            try {
-                const cleaned = response.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
-                synthesisResult = JSON.parse(cleaned)
-            } catch (e) {
-                console.error('JSON Parse error', e)
-            }
-        }
-
-        // === DETERMINISTIC FALLBACK — works without AI ===
-        if (!synthesisResult) {
-            const techA = Array.isArray(a.core_tech) ? a.core_tech : ['AI']
-            const techB = b.core_tech ? (Array.isArray(b.core_tech) ? b.core_tech : ['Tech']) : ['AI']
-            const combinedTech = [...new Set([...techA, ...techB])]
-            const synTitle = `${a.title.split(' ').slice(0, 2).join(' ')} × ${b.title.split(' ').slice(0, 2).join(' ')}`
-            
-            synthesisResult = {
-                synergy_title: synTitle,
-                synergy_description: `Синергия бизнес-модели «${a.title}» и технологии «${b.title}». Объединение аудиторий и компетенций создаёт новую ценность для рынка.`,
-                mvp_scenario: `За 3 месяца: интегрировать ${techA[0] || 'API'} из идеи А с ключевым механизмом идеи Б. Запустить закрытое бета-тестирование с 50 клиентами.`,
-                logic_chain: `${a.title} обеспечивает спрос и клиентскую базу. ${b.title} добавляет технологическую глубину. Результат: продукт с уникальным сочетанием.`,
-                classification: {
-                    vertical: a.vertical || b.vertical || 'ProductivityTools',
-                    core_tech: combinedTech.slice(0, 4),
-                    target_audience: a.target_audience || b.target_audience || 'B2B-компании',
-                    business_model: a.business_model || 'SaaS'
-                },
-                thinking_models: {
-                    blue_ocean_errc: `Eliminate: сложная ручная интеграция. Create: автоматическая синергия двух рынков.`,
-                    knowledge_transfer: `Экспертиза из ${a.vertical || 'домена A'} применяется к задачам ${b.vertical || 'домена B'}.`,
-                    scamper: `Combine: объединить аудитории и технологии обеих идей.`,
-                    jobs_to_be_done: `Клиент хочет решить задачу без лишних шагов, используя лучшее из двух миров.`
-                },
-                defensibility: {
-                    competitive_moat: 'Сетевой эффект: чем больше пользователей, тем ценнее продукт.',
-                    unfair_advantage: `Уникальное сочетание: ${a.title} + ${b.title} = новый сегмент.`
-                },
-                ai_trend_forecast: 'ИИ усилит ключевые механизмы продукта: автоматизация, персонализация и предиктивный анализ станут основой дифференциации через 5 лет.',
-                contrarian_bet: 'Рынок недооценивает потенциал объединения этих двух ниш.',
-                anti_pattern_check: 'Продукт решает конкретную задачу конкретного сегмента, а не пытается быть универсальной платформой.',
-                _fallback: true
-            }
-        }
-
-        // Save to temporary synergies log
-        await supabase.from('synergies').insert({
-            idea_a_id: a.id,
-            idea_b_id: modeTitle === "Strategic Evolution" ? null : b.id,
-            synergy_title: synthesisResult.synergy_title,
-            synergy_description: synthesisResult.synergy_description,
-            logic_chain: synthesisResult.logic_chain,
-            score: scores.total,
-            metadata: {
-                mode: modeTitle,
-                thinking_models: synthesisResult.thinking_models,
-                contrarian_bet: synthesisResult.contrarian_bet,
-                scores: scores,
-                defensibility: synthesisResult.defensibility,
-                mvp_scenario: synthesisResult.mvp_scenario,
-                ai_trend_forecast: synthesisResult.ai_trend_forecast
-            }
-        })
-
-        // Automatically save to the 'ideas' table (Archive) 
-        let adminSupabase = createAdminClient()
-        if (!adminSupabase) {
-            console.warn('⚠️ Missing admin client in find-next, falling back to standard client')
-            adminSupabase = await createClient()
-        }
-        const classification = synthesisResult.classification || {}
-
-        const safeString = (val: any, fallback: string) => {
-            if (!val) return fallback;
-            if (typeof val === 'string') return val;
-            return JSON.stringify(val);
-        };
-
-        const safeTitle = safeString(synthesisResult.synergy_title, "Новая Возможность");
-        const safeDesc = safeString(synthesisResult.synergy_description || synthesisResult.hypothesis, "");
-        const safeVertical = safeString(classification.vertical, "Other");
-        const safeTargetAudience = safeString(classification.target_audience, "General");
-        const safeBusinessModel = safeString(classification.business_model, "TBD");
-
-        let safeCoreTech: string[] = [];
-        if (Array.isArray(classification.core_tech)) {
-            safeCoreTech = classification.core_tech.map(String);
-        } else if (typeof classification.core_tech === 'string') {
-            safeCoreTech = [classification.core_tech];
-        }
-
-        const newIdea = {
-            source: 'synergy',
-            title: safeTitle,
-            description: safeDesc,
-            is_favorite: false,
-            is_synergy: true,
-            vertical: safeVertical,
-            core_tech: safeCoreTech,
-            target_audience: safeTargetAudience,
-            business_model: safeBusinessModel,
-            pain_point: ['Синтезировано блендером'],
-            temporal_marker: 'Now',
-            metadata: {
-                logic_chain: synthesisResult.logic_chain,
-                score: scores.total,
-                mode: modeTitle,
-                components: [a, b],
-                is_auto_saved: true,
-                ai_trend_forecast: synthesisResult.ai_trend_forecast
-            }
-        }
-
-        let idea_id = null
-        try {
-            const { data: savedIdea, error: insertError } = await adminSupabase
-                .from('ideas')
-                .insert(newIdea)
-                .select('id')
-                .single()
-
-            if (insertError) {
-                console.error("Supabase Insert Error for synergy:", insertError);
-            } else if (savedIdea) {
-                idea_id = savedIdea.id
-            }
-        } catch (err) {
-            console.error('Failed to auto-save synergy idea', err)
-        }
+        const result = results[0]
+        const a = result.components?.[0]
+        const b = result.components?.[1]
+        const idea_id = a && b
+            ? await saveSynergy(supabase, result, a, b, result.scores, result.mode || 'det')
+            : null
 
         return NextResponse.json({
-            status: 'success',
-            synergy_status: 'synergy_found',
-            mode: modeTitle,
-            idea_id: idea_id,
-            ...synthesisResult,
-            scores: {
-                total: Math.round(scores.total * 10) / 10,
-                blue_ocean: Math.round(scores.blue_ocean * 10) / 10,
-                knowledge_transfer: Math.round(scores.knowledge_transfer * 10) / 10
-            },
-            components: [a, b],
-            synergy_score: Math.round(scores.total)
-        })
+            status: 'synergy_found',
+            mode: result.mode,
+            idea_id,
+            synergy_title: result.synergy_title,
+            synergy_description: result.synergy_description,
+            mvp_scenario: result.mvp_scenario,
+            logic_chain: result.logic_chain,
+            classification: result.classification,
+            thinking_models: result.thinking_models,
+            defensibility: result.defensibility,
+            ai_trend_forecast: result.ai_trend_forecast,
+            contrarian_bet: result.contrarian_bet,
+            anti_pattern_check: result.anti_pattern_check,
+            scores: result.scores,
+            components: result.components,
+            synergy_score: result.synergy_score,
+        } as any)
 
     } catch (error: any) {
         console.error('Error in route:', error)

@@ -96,7 +96,7 @@ export async function fetchAndStoreFeed() {
                 source: 'automatic',
                 title: item.title,
                 description: item.summary,
-                vertical: 'News',
+                vertical: item.vertical || 'News',
                 original_url: item.url,
                 is_synergy: false,
                 core_tech: item.core_tech ? [item.core_tech] : [],

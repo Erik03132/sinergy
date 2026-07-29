@@ -2,6 +2,7 @@
 import { createClient } from "../supabase/server";
 import { askGemini } from "../ai/gemini";
 import { extractTelegramInfo, getRecentTelegramPosts } from "./telegram";
+import * as cheerio from 'cheerio';
 import { BANNED_KEYWORDS } from "./constants";
 
 export async function registerChannel(details: { title: string; url: string; sourceType: 'telegram' | 'web' }) {
@@ -33,6 +34,16 @@ export function isContentBanned(text: string): boolean {
  * Атомарное извлечение идей. 
  * Из одного источника (статьи/поста) теперь может быть создано НЕСКОЛЬКО карточек.
  */
+function shortHash(input: string, length: number = 8): string {
+    let hash = 0;
+    for (let i = 0; i < input.length; i++) {
+        const char = input.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return Math.abs(hash).toString(36).substring(0, length);
+}
+
 async function registerSource(details: any, type: 'telegram' | 'web') {
     const supabase = await createClient();
 
@@ -129,10 +140,10 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
         if (!idea.title || !idea.summary) continue;
 
         // Создаем уникальный ID 
-        const ideaHash = Buffer.from(idea.title).toString('base64').substring(0, 8);
+        const ideaHash = shortHash(idea.title, 8);
         const externalId = type === 'telegram' ?
             `${details.channelHandle}_${details.id}_${ideaHash}` :
-            `${Buffer.from(details.url).toString('base64').substring(0, 15)}_${ideaHash}`;
+            `${shortHash(details.url, 15)}_${ideaHash}`;
 
         // Проверка на дубликаты
         const { data: existing } = await supabase
@@ -150,7 +161,7 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
             source: 'automatic',
             title: idea.title,
             description: idea.summary,
-            vertical: 'News',
+            vertical: idea.vertical || 'News',
             original_url: details.url,
             is_synergy: false,
             core_tech: idea.core_tech ? [idea.core_tech] : [],
@@ -201,7 +212,6 @@ export async function processManualUrl(url: string, query?: string) {
             if (!response.ok) return;
 
             const html = await response.text();
-            const cheerio = await import('cheerio') as any;
             const $ = cheerio.load(html);
 
             $('script, style, nav, footer, header').remove();
@@ -209,7 +219,7 @@ export async function processManualUrl(url: string, query?: string) {
             const bodyContent = $('body').text().replace(/\s+/g, ' ').substring(0, 8000);
 
             const sourceDetails = {
-                id: Buffer.from(url).toString('base64').substring(0, 20),
+                id: shortHash(url, 20),
                 title: pageTitle,
                 text: `URL info: ${url}\n\nContent: ${bodyContent}`,
                 url: url,
