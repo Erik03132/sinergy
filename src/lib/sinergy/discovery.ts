@@ -1,9 +1,13 @@
-
 import { createClient } from '@/lib/supabase/server'
 import { processManualUrl } from "./source-processor";
 import { getHNShow } from "./hackernews";
 import { getProductHuntTrending } from "./producthunt";
 import { getDevToStartupPosts } from "./devto";
+import { getRedditStartupPosts } from "./reddit";
+import { getGitHubTrendingAll } from "./github-trending";
+import { getIndieHackersPosts } from "./indiehackers";
+import { getTechCrunchStartupPosts } from "./techcrunch";
+import { translateBatch } from '@/lib/ai/translate'
 
 export interface DiscoveryResult {
     count: number
@@ -13,7 +17,7 @@ export interface DiscoveryResult {
 const errors: string[] = []
 const err = (msg: string) => { errors.push(msg); console.error(msg) }
 
-const FETCH_TIMEOUT = 6000
+const FETCH_TIMEOUT = 5000
 
 async function fetchWithTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Promise<T> {
   const controller = new AbortController()
@@ -34,6 +38,50 @@ function shortHash(input: string, length: number = 8): string {
     }
     return Math.abs(hash).toString(36).substring(0, length);
 }
+
+interface SourceDefinition {
+  name: string
+  fetcher: (signal: AbortSignal) => Promise<any[]>
+  mapper: (item: any) => { title: string; description: string; url: string; source: string }
+}
+
+const SOURCES: SourceDefinition[] = [
+  {
+    name: 'HN',
+    fetcher: (s) => getHNShow(15, s),
+    mapper: (i) => ({ title: i.title, description: i.text || i.title, url: i.url || `https://news.ycombinator.com/item?id=${i.id}`, source: 'HN' }),
+  },
+  {
+    name: 'PH',
+    fetcher: (s) => getProductHuntTrending(s),
+    mapper: (i) => ({ title: i.title, description: i.tagline, url: i.url, source: 'PH' }),
+  },
+  {
+    name: 'DevTo',
+    fetcher: (s) => getDevToStartupPosts(s),
+    mapper: (i) => ({ title: i.title, description: i.description, url: i.url, source: 'DevTo' }),
+  },
+  {
+    name: 'Reddit',
+    fetcher: async (s) => getRedditStartupPosts(5, s),
+    mapper: (i) => ({ title: i.title, description: i.selftext?.slice(0, 500), url: i.url, source: `r/${i.subreddit}` }),
+  },
+  {
+    name: 'GH',
+    fetcher: async (s) => getGitHubTrendingAll(s),
+    mapper: (i) => ({ title: i.title, description: i.description?.slice(0, 500), url: i.url, source: 'GitHub' }),
+  },
+  {
+    name: 'IH',
+    fetcher: (s) => getIndieHackersPosts(s),
+    mapper: (i) => ({ title: i.title, description: i.description?.slice(0, 500), url: i.url, source: 'IH' }),
+  },
+  {
+    name: 'TC',
+    fetcher: (s) => getTechCrunchStartupPosts(s),
+    mapper: (i) => ({ title: i.title, description: i.description?.slice(0, 500), url: i.url, source: 'TC' }),
+  },
+]
 
 async function processSource(
     supabase: any,
@@ -81,8 +129,24 @@ async function processSource(
 
         if (newItems.length === 0) return 0
 
+        let toSave = newItems
+        try {
+          const translated = await translateBatch(
+            newItems.map((i: any) => ({ title: i.title, description: i.description || i.title }))
+          )
+          toSave = newItems.map((item: any, idx: number) => ({
+            ...item,
+            title: translated[idx]?.title || item.title,
+            description: translated[idx]?.description || item.description,
+            summary: translated[idx]?.summary || undefined,
+          }))
+          err(`[${sourceName}] translated ${translated.length} items`)
+        } catch (e: any) {
+          err(`[${sourceName}] translate failed, using originals: ${e?.message || e}`)
+        }
+
         let saved = 0;
-        for (const item of newItems) {
+        for (const item of toSave) {
             try {
                 const { error: insertErr } = await supabase.from('ideas').insert({
                     source: 'user',
@@ -99,7 +163,8 @@ async function processSource(
                         original_source: item.source,
                         original_url: item.url,
                         unique_id: shortHash(item.url, 8),
-                        auto_discovered: true
+                        auto_discovered: true,
+                        summary: item.summary || undefined,
                     }
                 })
                 if (insertErr) {
@@ -125,13 +190,15 @@ export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
     const supabase = await createClient()
     let total = 0
 
-    for (const [name, fetch, map] of [
-        ['HN', (s: AbortSignal) => getHNShow(15, s), (i: any) => ({ title: i.title, description: i.text || i.title, url: i.url || `https://news.ycombinator.com/item?id=${i.id}`, source: 'HN' })],
-        ['PH', (s: AbortSignal) => getProductHuntTrending(s), (i: any) => ({ title: i.title, description: i.tagline, url: i.url, source: 'PH' })],
-        ['DevTo', (s: AbortSignal) => getDevToStartupPosts(s), (i: any) => ({ title: i.title, description: i.description, url: i.url, source: 'DevTo' })],
-    ] as const) {
-        const c = await processSource(supabase, name, fetch, map as any)
-        total += c
+    const results = await Promise.allSettled(
+      SOURCES.map(({ name, fetcher, mapper }) =>
+        processSource(supabase, name, fetcher, mapper as any)
+      )
+    )
+
+    for (const r of results) {
+      if (r.status === 'fulfilled') total += r.value
+      else err(`source crash: ${r.reason?.message || r.reason}`)
     }
 
     try {

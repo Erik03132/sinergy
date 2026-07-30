@@ -21,18 +21,19 @@ const SUBREDDITS = [
   'alphaandbetausers',
 ]
 
-export async function getRedditStartupPosts(limitPerSub: number = 10): Promise<RedditPost[]> {
+export async function getRedditStartupPosts(limitPerSub: number = 5, signal?: AbortSignal): Promise<RedditPost[]> {
   const results: RedditPost[] = []
 
-  for (const sub of SUBREDDITS) {
+  const fetches = SUBREDDITS.map(async (sub) => {
     try {
       const res = await fetch(`https://www.reddit.com/r/${sub}/hot.json?limit=${limitPerSub}`, {
+        signal,
         headers: {
           'User-Agent': 'Sinergy/1.0 (startup discovery)',
           'Accept': 'application/json',
         }
       })
-      if (!res.ok) continue
+      if (!res.ok) return
 
       const data = await res.json()
 
@@ -54,7 +55,8 @@ export async function getRedditStartupPosts(limitPerSub: number = 10): Promise<R
         })
       }
     } catch { }
-  }
+  })
 
+  await Promise.allSettled(fetches)
   return results
 }

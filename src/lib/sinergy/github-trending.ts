@@ -7,11 +7,12 @@ export interface TrendingRepo {
   forks: number
 }
 
-export async function getGitHubTrending(language: string = 'typescript', since: 'daily' | 'weekly' = 'daily'): Promise<TrendingRepo[]> {
+async function getGitHubTrending(language: string, since: 'daily' | 'weekly', signal?: AbortSignal): Promise<TrendingRepo[]> {
   try {
     const res = await fetch(
       `https://api.github.com/search/repositories?q=created:>${daysAgo(since)}+language:${language}&sort=stars&order=desc&per_page=10`,
       {
+        signal,
         headers: {
           'Accept': 'application/vnd.github.v3+json',
           'User-Agent': 'Sinergy/1.0'
@@ -33,10 +34,15 @@ export async function getGitHubTrending(language: string = 'typescript', since: 
   }
 }
 
-export async function getGitHubTrendingAll(): Promise<TrendingRepo[]> {
+export async function getGitHubTrendingAll(signal?: AbortSignal): Promise<TrendingRepo[]> {
   const langs = ['typescript', 'python', 'javascript', 'go', 'rust', 'swift']
-  const results = await Promise.all(langs.map(l => getGitHubTrending(l, 'daily')))
-  const flat = results.flat()
+  const results = await Promise.allSettled(
+    langs.map(l => getGitHubTrending(l, 'daily', signal))
+  )
+  const flat: TrendingRepo[] = []
+  for (const r of results) {
+    if (r.status === 'fulfilled') flat.push(...r.value)
+  }
   const seen = new Set<string>()
   return flat.filter(r => {
     if (seen.has(r.title)) return false
