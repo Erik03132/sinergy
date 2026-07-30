@@ -1,4 +1,4 @@
-import { askOpenRouter } from './openrouter'
+import { askGemini } from './gemini'
 
 interface Translatable {
   title: string
@@ -30,7 +30,7 @@ ${items.map((item, i) => `[${i}]
 title: ${item.title}
 description: ${item.description || '-'}`).join('\n\n')}`
 
-  const raw = await askOpenRouter(prompt)
+  const raw = await askGemini(prompt)
 
   const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*$/g, '').trim()
   const parsed: TranslatedResult[] = JSON.parse(cleaned)
