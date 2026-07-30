@@ -23,6 +23,7 @@
         "next": "^16.1.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
+        "socks-proxy-agent": "^10.1.0",
         "sonner": "1.7.0",
         "tailwind-merge": "^2.6.0",
         "zod": "^3.23.8"

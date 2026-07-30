@@ -1,6 +1,6 @@
-import { HttpsProxyAgent } from 'https-proxy-agent'
+import { SocksProxyAgent } from 'socks-proxy-agent'
 
-const PROXY_URL = process.env.HTTP_PROXY || 'http://Q3NeJXTY:dsBaWh2L@172.120.21.141:64468'
+const PROXY_URL = process.env.HTTP_PROXY || 'socks5h://Q3NeJXTY:dsBaWh2L@172.120.21.141:64469'
 
 const OR_MODELS = [
   'nvidia/nemotron-3-ultra-550b-a55b:free',
@@ -11,11 +11,16 @@ const OR_MODELS = [
   'openai/gpt-oss-20b:free',
 ]
 
+const API_KEY = process.env.OPENROUTER_API_KEY
+
 async function fetchViaProxy(url: string, body: object, signal: AbortSignal): Promise<string> {
-  const agent = new HttpsProxyAgent(PROXY_URL)
+  const agent = new SocksProxyAgent(PROXY_URL)
   const res = await fetch(url, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${API_KEY}`,
+    },
     body: JSON.stringify(body),
     signal,
     dispatcher: agent as any,
@@ -40,9 +45,6 @@ export async function askOmni(prompt: string, system?: string): Promise<string> 
   ]
 
   try {
-    const apiKey = process.env.OPENROUTER_API_KEY
-    if (!apiKey) throw new Error('OPENROUTER_API_KEY not set')
-
     for (const model of OR_MODELS) {
       try {
         return await fetchViaProxy('https://openrouter.ai/api/v1/chat/completions', {
