@@ -223,3 +223,64 @@ export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
     err(`total saved: ${total}`)
     return { count: total, errors: [...errors] }
 }
+
+export async function retranslateExisting(): Promise<{ updated: number; errors: string[] }> {
+  errors.length = 0
+  const supabase = await createClient()
+
+  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+
+  const { data: recent, error: selectErr } = await supabase
+    .from('ideas')
+    .select('id, title, description, metadata')
+    .eq('source', 'user')
+    .gte('created_at', since)
+    .order('created_at', { ascending: false })
+    .limit(100)
+
+  if (selectErr) {
+    err(`retranslate select error: ${selectErr.message}`)
+    return { updated: 0, errors: [...errors] }
+  }
+  if (!recent || recent.length === 0) {
+    err('retranslate: no recent items to translate')
+    return { updated: 0, errors: [...errors] }
+  }
+
+  err(`retranslate: ${recent.length} items to process`)
+
+  try {
+    const translated = await translateBatch(
+      recent.map((r: any) => ({ title: r.title, description: r.description || r.title }))
+    )
+
+    let updated = 0
+    for (let i = 0; i < recent.length; i++) {
+      const item = recent[i]
+      const t = translated[i]
+      if (!t) continue
+
+      const meta = item.metadata || {}
+      const { error: updateErr } = await supabase
+        .from('ideas')
+        .update({
+          title: t.title?.slice(0, 500) || item.title,
+          description: (t.description || t.title || item.description)?.slice(0, 2000),
+          metadata: { ...meta, summary: t.summary || meta.summary, retranslated: true }
+        })
+        .eq('id', item.id)
+
+      if (updateErr) {
+        err(`retranslate update err for ${item.id}: ${updateErr.message}`)
+      } else {
+        updated++
+      }
+    }
+
+    err(`retranslate: updated ${updated}/${recent.length}`)
+    return { updated, errors: [...errors] }
+  } catch (e: any) {
+    err(`retranslate failed: ${e?.message || e}`)
+    return { updated: 0, errors: [...errors] }
+  }
+}
