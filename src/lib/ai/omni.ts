@@ -23,7 +23,24 @@ export async function askOmni(prompt: string, system?: string): Promise<string> 
   const timer = setTimeout(() => controller.abort(), 30000)
 
   try {
-    // 1. Try OmniRoute
+    // 1. DeepSeek (works in Russia, cheap)
+    const dsKey = process.env.DEEPSEEK_API_KEY
+    if (dsKey) {
+      try {
+        return await fetchChat('https://api.deepseek.com/v1/chat/completions', {
+          model: 'deepseek-chat',
+          messages: [
+            ...(system ? [{ role: 'system' as const, content: system }] : []),
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.3,
+        }, controller.signal)
+      } catch (e: any) {
+        console.warn(`DeepSeek failed: ${e.message}, trying OmniRoute...`)
+      }
+    }
+
+    // 2. OmniRoute (VPS, free models)
     try {
       return await fetchChat(`${OMNI_URL}/chat/completions`, {
         model: OMNI_MODEL,
@@ -34,20 +51,7 @@ export async function askOmni(prompt: string, system?: string): Promise<string> 
         temperature: 0.3,
       }, controller.signal)
     } catch (e: any) {
-      console.warn(`OmniRoute failed: ${e.message}, trying DeepSeek...`)
-    }
-
-    // 2. Fallback: DeepSeek directly (works in Russia)
-    const dsKey = process.env.DEEPSEEK_API_KEY
-    if (dsKey) {
-      return await fetchChat('https://api.deepseek.com/v1/chat/completions', {
-        model: 'deepseek-chat',
-        messages: [
-          ...(system ? [{ role: 'system', content: system }] : []),
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.3,
-      }, controller.signal)
+      console.warn(`OmniRoute failed: ${e.message}`)
     }
 
     throw new Error('All AI providers failed')
