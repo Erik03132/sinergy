@@ -9,6 +9,8 @@ export async function GET() {
 
     // 1. Проверка HTTP-запроса
     push('=== DIAGNOSE START ===')
+    push(`DEEPSEEK_KEY: ${process.env.DEEPSEEK_API_KEY ? 'SET (' + process.env.DEEPSEEK_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
+    push(`OPENROUTER_KEY: ${process.env.OPENROUTER_API_KEY ? 'SET (' + process.env.OPENROUTER_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
     try {
         const c = new AbortController()
         const t = setTimeout(() => c.abort(), 5000)
