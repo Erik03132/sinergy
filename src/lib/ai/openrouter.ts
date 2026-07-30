@@ -12,14 +12,14 @@ interface OpenRouterResponse {
     }>;
 }
 
-// List of reliable models on OpenRouter
+// Актуальные бесплатные модели OpenRouter (апрель 2026)
 const OR_MODELS = [
-    'google/gemini-2.0-flash-001',       // Very cheap/free
-    'google/gemini-2.0-flash-lite-preview-02-05:free', // Try specific free ID if it exists, but fallback to others
-    'deepseek/deepseek-chat',            // Cheap
-    'qwen/qwen-2.5-72b-instruct',        // High quality
-    'mistralai/mistral-7b-instruct',     // Standard
-    'meta-llama/llama-3-8b-instruct:free' // Llama 3 free
+    'nvidia/nemotron-3-ultra-550b-a55b:free',       // 1M контекст, самая мощная бесплатная
+    'openrouter/free',                                // Автоматический роутер по всем бесплатным
+    'google/gemma-4-31b-it:free',                     // Google Gemma 4 31B
+    'google/gemma-4-26b-a4b-it:free',                // Google Gemma 4 26B
+    'cohere/north-mini-code:free',                   // Cohere North Mini
+    'openai/gpt-oss-20b:free',                       // OpenAI OSS
 ]
 
 export async function askOpenRouter(prompt: string): Promise<string> {
@@ -56,13 +56,18 @@ export async function askOpenRouter(prompt: string): Promise<string> {
             if (!response.ok) {
                 const err = await response.text()
                 console.warn(`OpenRouter model ${model} failed (${response.status}): ${err}`)
-                continue // Try next model
+                continue
             }
 
-            const data: OpenRouterResponse = await response.json()
-            return data.choices[0].message.content
-        } catch (error) {
-            console.error(`OpenRouter error with ${model}:`, error)
+            const data = await response.json()
+            const content = data?.choices?.[0]?.message?.content
+            if (content) return content
+
+            console.warn(`OpenRouter model ${model} вернул пустой ответ:`, JSON.stringify(data).slice(0, 200))
+            continue
+        } catch (error: unknown) {
+            const msg = error instanceof Error ? error.message : String(error)
+            console.error(`OpenRouter error with ${model}: ${msg}`)
         }
     }
 

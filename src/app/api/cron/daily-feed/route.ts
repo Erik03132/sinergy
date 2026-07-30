@@ -20,17 +20,16 @@ export async function GET(req: Request) {
     console.log('[Cron] Starting Daily Feed Update...')
 
     try {
-        const addedCount = await fetchAndStoreFeed()
+        const { count } = await fetchAndStoreFeed()
 
-        // Логируем успех
         await supabase.from('cron_logs').insert({
             name: 'daily-feed',
             status: 'success',
-            item_count: addedCount,
-            message: `Automated scan finished. Added ${addedCount} items.`
+            item_count: count,
+            message: `Automated scan finished. Added ${count} items.`
         })
 
-        return NextResponse.json({ success: true, added: addedCount })
+        return NextResponse.json({ success: true, added: count })
 
     } catch (error: any) {
         console.error('[Cron Error]', error.message)
