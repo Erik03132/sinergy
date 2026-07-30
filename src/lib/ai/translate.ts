@@ -1,4 +1,4 @@
-import { askGemini } from './gemini'
+import { askOmni } from './omni'
 
 interface Translatable {
   title: string
@@ -30,7 +30,7 @@ ${items.map((item, i) => `[${i}]
 title: ${item.title}
 description: ${item.description || '-'}`).join('\n\n')}`
 
-  const raw = await askGemini(prompt)
+  const raw = await askOmni(prompt, 'Ты переводишь заголовки и описания стартапов. Отвечай только JSON.')
 
   const cleaned = raw.replace(/```json\s*/gi, '').replace(/```\s*$/g, '').trim()
   const parsed: TranslatedResult[] = JSON.parse(cleaned)
