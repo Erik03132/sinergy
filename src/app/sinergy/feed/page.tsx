@@ -185,6 +185,11 @@ export default function NewsFeedPage() {
                                 <p className="text-neutral-400 leading-relaxed text-sm md:text-base text-left opacity-80 px-4">
                                     {item.description}
                                 </p>
+                                {item.metadata?.summary && (
+                                    <p className="text-neutral-500 leading-relaxed text-xs md:text-sm text-left px-4 mt-1 italic border-l-2 border-emerald-900/50 pl-3">
+                                        {item.metadata.summary}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="flex flex-row md:flex-col gap-2 justify-end md:justify-center border-t md:border-t-0 md:border-l border-neutral-800 pt-4 md:pt-0 md:pl-6">

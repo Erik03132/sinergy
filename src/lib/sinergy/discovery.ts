@@ -83,12 +83,20 @@ const SOURCES: SourceDefinition[] = [
   },
 ]
 
-async function processSource(
+interface PendingItem {
+  title: string
+  description: string
+  url: string
+  source: string
+  sourceName: string
+}
+
+async function collectSource(
     supabase: any,
     sourceName: string,
     fetcher: (signal: AbortSignal) => Promise<any[]>,
     mapper: (item: any) => { title: string; description: string; url: string; source: string }
-): Promise<number> {
+): Promise<PendingItem[]> {
     try {
         err(`[${sourceName}] fetch start`)
         const raw = await fetchWithTimeout(fetcher)
@@ -96,12 +104,12 @@ async function processSource(
 
         if (!raw || raw.length === 0) {
             err(`[${sourceName}] empty response`)
-            return 0
+            return []
         }
 
         const items = raw.map(mapper).filter((i: any) => i.title && i.url)
         err(`[${sourceName}] mapped: ${items.length} items`)
-        if (items.length === 0) return 0
+        if (items.length === 0) return []
 
         const { data: recent, error: selectErr } = await supabase.from('ideas')
             .select('title, metadata')
@@ -109,9 +117,8 @@ async function processSource(
             .limit(200);
         if (selectErr) {
             err(`[${sourceName}] DB select error: ${selectErr.message}`)
-            return 0
+            return []
         }
-        err(`[${sourceName}] DB got ${recent?.length || 0} existing`)
 
         const seenTitles = new Set(recent?.map((e: any) => e.title));
         const seenUrls = new Set(
@@ -127,80 +134,83 @@ async function processSource(
         });
         err(`[${sourceName}] after dedup: ${newItems.length}`)
 
-        if (newItems.length === 0) return 0
-
-        let toSave = newItems
-        try {
-          const translated = await translateBatch(
-            newItems.map((i: any) => ({ title: i.title, description: i.description || i.title }))
-          )
-          toSave = newItems.map((item: any, idx: number) => ({
-            ...item,
-            title: translated[idx]?.title || item.title,
-            description: translated[idx]?.description || item.description,
-            summary: translated[idx]?.summary || undefined,
-          }))
-          err(`[${sourceName}] translated ${translated.length} items`)
-        } catch (e: any) {
-          err(`[${sourceName}] translate failed, using originals: ${e?.message || e}`)
-        }
-
-        let saved = 0;
-        for (const item of toSave) {
-            try {
-                const { error: insertErr } = await supabase.from('ideas').insert({
-                    source: 'user',
-                    title: item.title.slice(0, 500),
-                    description: (item.description || item.title).slice(0, 2000),
-                    vertical: 'News',
-                    core_tech: [],
-                    target_audience: 'TBD',
-                    business_model: 'TBD',
-                    pain_point: [],
-                    temporal_marker: new Date().toISOString().split('T')[0],
-                    metadata: {
-                        type: sourceName.toLowerCase(),
-                        original_source: item.source,
-                        original_url: item.url,
-                        unique_id: shortHash(item.url, 8),
-                        auto_discovered: true,
-                        summary: item.summary || undefined,
-                    }
-                })
-                if (insertErr) {
-                    err(`[${sourceName}] insert err for "${item.title.slice(0, 30)}": ${insertErr.message}`)
-                } else {
-                    saved++
-                }
-            } catch (e: any) {
-                err(`[${sourceName}] insert ex: ${e?.message || e}`)
-            }
-        }
-
-        err(`[${sourceName}] saved ${saved}/${newItems.length}`)
-        return saved
+        return newItems.map((i: any) => ({ ...i, sourceName }))
     } catch (e: any) {
         err(`[${sourceName}] crash: ${e?.message || e}`)
-        return 0
+        return []
     }
 }
 
 export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
     errors.length = 0
     const supabase = await createClient()
-    let total = 0
 
-    const results = await Promise.allSettled(
+    // 1. Collect all items from all sources in parallel
+    const collected: PendingItem[] = []
+    const sourceResults = await Promise.allSettled(
       SOURCES.map(({ name, fetcher, mapper }) =>
-        processSource(supabase, name, fetcher, mapper as any)
+        collectSource(supabase, name, fetcher, mapper as any)
       )
     )
-
-    for (const r of results) {
-      if (r.status === 'fulfilled') total += r.value
+    for (const r of sourceResults) {
+      if (r.status === 'fulfilled') collected.push(...r.value)
       else err(`source crash: ${r.reason?.message || r.reason}`)
     }
+    err(`collected ${collected.length} new items total`)
 
+    // 2. Translate everything in one batch
+    let toSave: PendingItem[] = collected
+    if (collected.length > 0) {
+      try {
+        const translated = await translateBatch(
+          collected.map((i) => ({ title: i.title, description: i.description || i.title }))
+        )
+        toSave = collected.map((item, idx) => ({
+          ...item,
+          title: translated[idx]?.title || item.title,
+          description: translated[idx]?.description || item.description,
+          summary: translated[idx]?.summary || undefined,
+        }))
+        err(`translated ${translated.length} items`)
+      } catch (e: any) {
+        err(`translate all failed, saving originals: ${e?.message || e}`)
+      }
+    }
+
+    // 3. Save all items
+    let total = 0
+    for (const item of toSave) {
+        try {
+            const { error: insertErr } = await supabase.from('ideas').insert({
+                source: 'user',
+                title: item.title.slice(0, 500),
+                description: (item.description || item.title).slice(0, 2000),
+                vertical: 'News',
+                core_tech: [],
+                target_audience: 'TBD',
+                business_model: 'TBD',
+                pain_point: [],
+                temporal_marker: new Date().toISOString().split('T')[0],
+                metadata: {
+                    type: item.sourceName.toLowerCase(),
+                    original_source: item.source,
+                    original_url: item.url,
+                    unique_id: shortHash(item.url, 8),
+                    auto_discovered: true,
+                    summary: item.summary || undefined,
+                }
+            })
+            if (insertErr) {
+                err(`insert err for "${item.title.slice(0, 30)}": ${insertErr.message}`)
+            } else {
+                total++
+            }
+        } catch (e: any) {
+            err(`insert ex: ${e?.message || e}`)
+        }
+    }
+
+    // 4. Channel sources
     try {
         const { data: channels } = await supabase.from('channels').select('*').limit(1)
         if (channels?.[0]) {
