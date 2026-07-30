@@ -36,20 +36,24 @@ function pickRandom<T>(items: T[], count: number): T[] {
     return shuffled.slice(0, count)
 }
 
+/**
+ * Заменяет random pair selection на детерминированный скоринг + diversity.
+ * Pipeline:
+ * 1. Скорит до 2000 случайных пар (фильтр по sanity + score > 3)
+ * 2. Из топ-50 добавляет diversity: не более 1 пары на идею, стратификация по вертикалям
+ * 3. Эволюционные катализаторы (30% случаев) — для свежих идей
+ */
 function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
-    if (ideas.length < 2) return []
+    const n = ideas.length
+    if (n < 2) return []
 
-    const isEvolutionMode = ideas.length < 3 || Math.random() > 0.4
-
-    if (isEvolutionMode) {
+    // 30% chance: стратегическая эволюция (идея + технологический катализатор)
+    if (Math.random() < 0.3) {
         const a = pickRandom(ideas, 1)[0]
-        const compatibleCatalysts = EVOLUTION_CATALYSTS.filter(c =>
+        const compatible = EVOLUTION_CATALYSTS.filter(c =>
             c.synergy_domains.some(d => a.vertical?.includes(d))
         )
-        const catalyst = compatibleCatalysts.length > 0
-            ? pickRandom(compatibleCatalysts, 1)[0]
-            : pickRandom(EVOLUTION_CATALYSTS, 1)[0]
-
+        const catalyst = compatible.length > 0 ? compatible[Math.floor(Math.random() * compatible.length)] : EVOLUTION_CATALYSTS[Math.floor(Math.random() * EVOLUTION_CATALYSTS.length)]
         const b: any = {
             ...catalyst,
             id: `catalyst-${catalyst.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
@@ -66,13 +70,11 @@ function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
         return [{ a, b, score: 5 + catalyst.maturity * 0.5 }]
     }
 
-    const candidates: PairCandidate[] = []
-    const n = ideas.length
-    const sampleCount = Math.min(pairCount, n * (n - 1) / 2)
+    // Step 1: Score up to 2000 random pairs → collect top pass
+    const maxScoreAttempts = 2000
+    const scoredPairs: PairCandidate[] = []
 
-    let attempts = 0
-    while (candidates.length < sampleCount && attempts < pairCount * 3) {
-        attempts++
+    for (let attempt = 0; attempt < maxScoreAttempts; attempt++) {
         const i = Math.floor(Math.random() * n)
         let j = Math.floor(Math.random() * n)
         if (n > 1) while (j === i) j = Math.floor(Math.random() * n)
@@ -83,11 +85,38 @@ function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
 
         const score = calculateConsensusSynergyScore(a, b)
         if (score > 3) {
-            candidates.push({ a, b, score })
+            scoredPairs.push({ a, b, score })
         }
     }
 
-    return candidates.sort((x, y) => y.score - x.score).slice(0, Math.min(10, candidates.length))
+    if (scoredPairs.length === 0) return []
+
+    // Step 2: Sort by score → take top 50
+    scoredPairs.sort((x, y) => y.score - x.score)
+    const top50 = scoredPairs.slice(0, 50)
+
+    // Step 3: Diversity filter — maximize variety
+    const usedIdeaIds = new Set<string>()
+    const selected: PairCandidate[] = []
+
+    for (const pair of top50) {
+        if (selected.length >= 10) break
+        if (usedIdeaIds.has(pair.a.id) || usedIdeaIds.has(pair.b.id)) continue
+        usedIdeaIds.add(pair.a.id)
+        usedIdeaIds.add(pair.b.id)
+        selected.push(pair)
+    }
+
+    // If not enough diverse pairs, add remaining top scorers
+    if (selected.length < 5) {
+        for (const pair of top50) {
+            if (selected.length >= 10) break
+            if (selected.some(p => p.a.id === pair.a.id || p.b.id === pair.b.id || p.a.id === pair.b.id || p.b.id === pair.a.id)) continue
+            selected.push(pair)
+        }
+    }
+
+    return selected
 }
 
 export type AgentMode = 'full' | 'det-only'
