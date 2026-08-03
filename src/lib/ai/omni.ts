@@ -54,26 +54,35 @@ function request(url: string, body: object, signal: AbortSignal): Promise<string
 
 export async function askOmni(prompt: string, system?: string): Promise<string> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 60000)
+  const timer = setTimeout(() => controller.abort(), 90000)
 
   const messages = [
     ...(system ? [{ role: 'system' as const, content: system }] : []),
     { role: 'user', content: prompt },
   ]
 
+  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
   try {
     if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not set')
 
-    for (const model of OR_MODELS) {
-      try {
-        return await request('https://openrouter.ai/api/v1/chat/completions', {
-          model,
-          messages,
-          temperature: 0.3,
-        }, controller.signal)
-      } catch (e: any) {
-        console.warn(`OR ${model} failed: ${e.message}`)
+    // 3 pass с задержкой между попытками (rate-limit на free моделях)
+    for (let pass = 0; pass < 3; pass++) {
+      for (const model of OR_MODELS) {
+        try {
+          return await request('https://openrouter.ai/api/v1/chat/completions', {
+            model,
+            messages,
+            temperature: 0.3,
+          }, controller.signal)
+        } catch (e: any) {
+          const isRateLimit = /429|rate|limit/i.test(e.message)
+          console.warn(`OR ${model} failed: ${e.message}${isRateLimit ? ' (rate-limited)' : ''}`)
+          if (isRateLimit) await sleep(1500)
+        }
       }
+      console.warn(`Pass ${pass + 1} exhausted, retrying...`)
+      await sleep(2000)
     }
 
     throw new Error('All OpenRouter models failed')
