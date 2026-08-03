@@ -11,6 +11,42 @@ export async function GET() {
     push('=== DIAGNOSE START ===')
     push(`DEEPSEEK_KEY: ${process.env.DEEPSEEK_API_KEY ? 'SET (' + process.env.DEEPSEEK_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
     push(`OPENROUTER_KEY: ${process.env.OPENROUTER_API_KEY ? 'SET (' + process.env.OPENROUTER_API_KEY.slice(0, 8) + '...)' : 'NOT SET'}`)
+
+    // 1a. Прямой тест OpenRouter через прокси
+    push('--- OR PROXY TEST ---')
+    try {
+        const https = await import('https')
+        const { HttpsProxyAgent } = await import('https-proxy-agent')
+        const agent = new HttpsProxyAgent('http://Q3NeJXTY:dsBaWh2L@172.120.21.141:64468')
+        const result = await new Promise<string>((resolve) => {
+            const req = https.default.request({
+                hostname: 'openrouter.ai',
+                path: '/api/v1/chat/completions',
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                },
+                agent,
+                timeout: 15000,
+            }, (res) => {
+                let data = ''
+                res.on('data', (c) => data += c)
+                res.on('end', () => resolve(`${res.statusCode}: ${data.slice(0, 150)}`))
+            })
+            req.on('error', (e) => resolve(`ERROR: ${e.message}`))
+            req.on('timeout', () => { req.destroy(); resolve('TIMEOUT') })
+            req.write(JSON.stringify({
+                model: 'google/gemma-4-31b-it:free',
+                messages: [{ role: 'user', content: 'hi' }],
+                max_tokens: 5,
+            }))
+            req.end()
+        })
+        push(`OR PROXY: ${result}`)
+    } catch (e: any) {
+        push(`OR PROXY EX: ${e?.message || e}`)
+    }
     try {
         const c = new AbortController()
         const t = setTimeout(() => c.abort(), 5000)
