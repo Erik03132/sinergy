@@ -18,32 +18,43 @@ export async function GET() {
         const https = await import('https')
         const { HttpsProxyAgent } = await import('https-proxy-agent')
         const agent = new HttpsProxyAgent('http://Q3NeJXTY:dsBaWh2L@172.120.21.141:64468')
-        const result = await new Promise<string>((resolve) => {
-            const req = https.default.request({
-                hostname: 'openrouter.ai',
-                path: '/api/v1/chat/completions',
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-                },
-                agent,
-                timeout: 15000,
-            }, (res) => {
-                let data = ''
-                res.on('data', (c) => data += c)
-                res.on('end', () => resolve(`${res.statusCode}: ${data.slice(0, 150)}`))
+        const models = [
+            'nvidia/nemotron-3-ultra-550b-a55b:free',
+            'openrouter/free',
+            'google/gemma-4-31b-it:free',
+            'cohere/north-mini-code:free',
+            'openai/gpt-oss-20b:free',
+            'google/gemma-4-26b-a4b-it:free',
+            'anthropic/claude-sonnet-4-20250514',
+        ]
+        for (const model of models) {
+            const result = await new Promise<string>((resolve) => {
+                const req = https.default.request({
+                    hostname: 'openrouter.ai',
+                    path: '/api/v1/chat/completions',
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                    },
+                    agent,
+                    timeout: 20000,
+                }, (res) => {
+                    let data = ''
+                    res.on('data', (c) => data += c)
+                    res.on('end', () => resolve(`${res.statusCode}`))
+                })
+                req.on('error', (e) => resolve(`ERROR: ${e.message}`))
+                req.on('timeout', () => { req.destroy(); resolve('TIMEOUT') })
+                req.write(JSON.stringify({
+                    model,
+                    messages: [{ role: 'user', content: 'hi' }],
+                    max_tokens: 5,
+                }))
+                req.end()
             })
-            req.on('error', (e) => resolve(`ERROR: ${e.message}`))
-            req.on('timeout', () => { req.destroy(); resolve('TIMEOUT') })
-            req.write(JSON.stringify({
-                model: 'google/gemma-4-31b-it:free',
-                messages: [{ role: 'user', content: 'hi' }],
-                max_tokens: 5,
-            }))
-            req.end()
-        })
-        push(`OR PROXY: ${result}`)
+            push(`OR ${model}: ${result}`)
+        }
     } catch (e: any) {
         push(`OR PROXY EX: ${e?.message || e}`)
     }
