@@ -42,22 +42,40 @@ export async function skepticValidate(a: Idea, b: Idea, synergyTitle: string, sy
         const apiKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY
         if (!apiKey) return deterministic
 
-        const prompt = `You are a Startup Validator (Skeptic). Your job is to find reasons why this synergy WON'T work.
+        const prompt = `Ты — скептик-инвестор. Найди реальные причины, почему эта стартап-синергия НЕ взлетит:
 
-Component A: ${a.title} — ${a.description}
-Component B: ${b.title} — ${b.description}
-Proposed Synergy: "${synergyTitle}" — ${synergyDesc}
+СТАРТАП A:
+- Продукт: ${a.title}
+- Аудитория: ${a.target_audience || '-'}
+- Технология: ${a.core_tech?.join(', ') || '-'}
+- Монетизация: ${a.business_model || '-'}
+- Проблема: ${a.pain_point?.[0] || '-'}
 
-Respond with valid JSON only:
+СТАРТАП B:
+- Продукт: ${b.title}
+- Аудитория: ${b.target_audience || '-'}
+- Технология: ${b.core_tech?.join(', ') || '-'}
+- Монетизация: ${b.business_model || '-'}
+- Проблема: ${b.pain_point?.[0] || '-'}
+
+Синергия: "${synergyTitle}" — ${synergyDesc}
+
+Найди КОНКРЕТНЫЕ риски:
+1. Market risk: рынок слишком мал? Кто уже пробовал и провалился?
+2. Execution risk: что самое сложное технически/организационно?
+3. Adoption risk: почему пользователи не переключатся с текущих решений?
+4. Competitor risk: кто из крупных игроков может убить продукт одной фичей?
+
+Ответь JSON:
 {
   "is_viable": true/false,
-  "risks": ["risk 1", "risk 2", "risk 3"],
-  "anti_pattern_check": "1 sentence: is this actually novel or just buzzwords?",
-  "competitors_note": "1 sentence: who would kill this product?",
+  "risks": ["конкретный риск 1", "конкретный риск 2", "конкретный риск 3"],
+  "anti_pattern_check": "1 предложение: это реально новый продукт или просто buzzwords?",
+  "competitors_note": "1 предложение: кто конкретно может убить этот продукт?",
   "failure_probability": "low|medium|high"
 }
 
-Be CRITICAL. Find real problems. Language: RUSSIAN.`
+Язык: РУССКИЙ. Будь жёстким и конкретным.`
 
         const raw = await askGemini(prompt, { search: false })
         const jsonMatch = raw.match(/\{[\s\S]*\}/)

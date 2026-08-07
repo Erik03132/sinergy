@@ -1,44 +1,16 @@
 /**
- * Builder Agent — детерминированный генератор MVP.
- * Работает без AI. Всегда возвращает корректный результат.
- * Собирает базовую структуру синергии из двух идей.
+ * Builder Agent — AI-генератор стартап-продуктов.
+ * Primary: Gemini создаёт конкретный продукт на стыке двух идей.
+ * Fallback: детерминированный синтез с шаблонами.
  */
 
 import { Idea, SynergyResult } from '@/types/sinergy'
-import { isTechSynergistic, sanityCheck, calculateConsensusSynergyScore } from '../scoring'
-import { SYNERGY_BANNED_PATTERNS } from '../constants'
-
-function extractDomain(idea: Idea): string[] {
-    const parts: string[] = []
-    if (idea.vertical) parts.push(idea.vertical)
-    if (idea.business_model) parts.push(idea.business_model)
-    if (idea.target_audience?.length) parts.push(idea.target_audience.substring(0, 40))
-    return parts
-}
+import { askGemini } from '@/lib/ai/gemini'
+import { sanityCheck, calculateConsensusSynergyScore } from '../scoring'
 
 function combineTech(a: Idea, b: Idea): string[] {
     const set = new Set([...(a.core_tech || []), ...(b.core_tech || [])])
     return [...set].slice(0, 4)
-}
-
-function generateMVP(a: Idea, b: Idea, tech: string[]): string {
-    const primaryTech = tech[0] || 'API'
-    const fallbackTech = tech[1] || primaryTech
-    const audA = a.target_audience || 'клиенты A'
-    const audB = b.target_audience || 'клиенты B'
-    return `За 3 месяца: интегрировать ${primaryTech} из «${a.title}» с ${fallbackTech} из «${b.title}». Собрать MVP с ядром: ${audA} + ${audB}. Запустить закрытое тестирование на 50 пользователях. Метрика: конверсия в repeat use >30%.`
-}
-
-function generateLogicChain(a: Idea, b: Idea): string {
-    return `${a.title} даёт ${a.business_model || 'спрос'}. ${b.title} усиливает через ${b.core_tech?.join(', ') || 'технологию'}. Результат: продукт, где ${a.target_audience || 'клиенты'} получают решение быстрее/дешевле.`
-}
-
-function generateDefensibility(a: Idea, b: Idea): { competitive_moat: string; unfair_advantage: string } {
-    const techOverlap = combineTech(a, b).length > 1 ? 'уникальная комбинация технологий' : 'первый на рынке'
-    return {
-        competitive_moat: `Сетевой эффект: ${a.title} × ${b.title} растёт с каждым пользователем. Плюс ${techOverlap}.`,
-        unfair_advantage: `Никто не комбинирует ${extractDomain(a)[0] || 'нишу A'} с ${extractDomain(b)[0] || 'нишей B'} так, как мы.`
-    }
 }
 
 export interface BuilderResult {
@@ -72,59 +44,153 @@ export interface BuilderResult {
     }
 }
 
-export function builderBuild(a: Idea, b: Idea): BuilderResult | null {
-    if (!sanityCheck(a, b)) return null
+const FALLBACK_BUILDER_PROMPT = `Ты — фаундер-визионер. Придумай КОНКРЕТНЫЙ НОВЫЙ СТАРТАП-ПРОДУКТ на стыке двух идей:
 
+ИДЕЯ A:
+Название: {titleA}
+Описание: {descA}
+Аудитория: {audienceA}
+Технология: {techA}
+Монетизация: {bizA}
+Проблема: {painA}
+
+ИДЕЯ B:
+Название: {titleB}
+Описание: {descB}
+Аудитория: {audienceB}
+Технология: {techB}
+Монетизация: {bizB}
+Проблема: {painB}
+
+Создай НОВЫЙ ПРОДУКТ, который не существует, но МОГ бы существовать. Это должен быть конкретный SaaS/платформа/приложение с названием, аудиторией и бизнес-моделью.
+
+Верни ТОЛЬКО JSON:
+{
+  "product_name": "конкретное название продукта",
+  "elevator_pitch": "одно предложение-питч",
+  "description": "3-5 предложений: что делает продукт, для кого, как решает проблему",
+  "target_audience": "конкретная аудитория (не B2B, а например HR-менеджеры в компаниях 50-200)",
+  "monetization": "конкретная модель заработка",
+  "vertical": "вертикаль (FinTech, EdTech, HealthTech, SaaS, etc)",
+  "core_tech": ["технология1", "технология2"],
+  "mvp_scope": "что в MVP за 3 месяца",
+  "logic_chain": "почему A+B дают именно этот продукт",
+  "moat": "конкурентное преимущество (сетевой эффект, data moat, switching cost)",
+  "unfair_advantage": "почему инкумбенты не сделают это за неделю",
+  "ai_trend": "как ИИ повлияет на этот рынок через 5 лет",
+  "contrarian_bet": "какое непопулярное мнение лежит в основе продукта",
+  "anti_pattern_check": "почему это НЕ просто агрегатор/платформа/дашборд",
+  "scores": {
+    "total": <0-10>,
+    "blue_ocean": <0-10>,
+    "knowledge_transfer": <0-10>
+  }
+}
+
+Язык: РУССКИЙ. Название продукта может быть на английском. Будь конкретным!`
+
+function deterministicFallback(a: Idea, b: Idea, score: number): BuilderResult {
     const tech = combineTech(a, b)
-    const domains = [...new Set([...(extractDomain(a)), ...(extractDomain(b))])]
-    const vertical = a.vertical !== b.vertical
+    const vertical = a.vertical !== b.vertical && a.vertical && b.vertical
         ? `${a.vertical} × ${b.vertical}`
-        : a.vertical || 'ProductivityTools'
+        : a.vertical || b.vertical || 'Технологии'
 
-    const score = calculateConsensusSynergyScore(a, b)
-    const titles = [a.title, b.title].filter(Boolean)
-    const synergyTitle = titles.length >= 2
-        ? `${titles[0].split(' ').slice(0, 2).join(' ')} × ${titles[1].split(' ').slice(0, 2).join(' ')}`
-        : 'Новая синергия'
-
-    const synergyDesc = `Синтез «${a.title}» и «${b.title}». Используем ${tech.join(', ') || 'ключевые технологии'} для создания продукта, решающего задачи ${a.target_audience || 'аудитории A'} и ${b.target_audience || 'аудитории B'}.`
-
-    const errc = a.business_model !== b.business_model
-        ? `Eliminate: ручная интеграция между ${extractDomain(a)[0] || 'A'} и ${extractDomain(b)[0] || 'B'}. Create: автоматическое объединение.`
-        : `Eliminate: посредники. Raise: скорость. Reduce: стоимость. Create: новый гибрид.`
-
-    const kt = `Экспертиза из ${extractDomain(a)[0] || 'домена A'} переносится в ${extractDomain(b)[0] || 'домен B'} через ${tech[0] || 'общую технологию'}.`
-
-    const scamper = `Combine: ${titles[0] || 'A'} + ${titles[1] || 'B'}. Adapt: применить бизнес-модель ${a.business_model || 'A'} к аудитории ${b.target_audience || 'B'}.`
-
-    const jtbd = `Клиент хочет «${a.pain_point?.[0] || 'решить проблему'}» и «${b.pain_point?.[0] || 'закрыть потребность'}» → одним продуктом.`
-
-    const aiForecast = `Через 5 лет ИИ автоматизирует рутину в этом сегменте. Продукт выиграет, если станет data-платформой, а не просто инструментом. Риск: если ИИ-заменитель войдёт раньше.`
-
-    const contrarian = `Рынок считает, что ${extractDomain(a)[0] || 'A'} и ${extractDomain(b)[0] || 'B'} — разные рынки. Мы считаем, что их пересечение — новый blue ocean.`
-
-    const antiPattern = `Продукт решает конкретную задачу: «${a.pain_point?.[0] || 'проблема A'} + ${b.pain_point?.[0] || 'проблема B'}». Не платформа, не агрегатор.`
+    const audA = a.target_audience || 'пользователи'
+    const audB = b.target_audience || 'клиенты'
 
     return {
-        synergy_title: synergyTitle,
-        synergy_description: synergyDesc,
-        mvp_scenario: generateMVP(a, b, tech),
-        logic_chain: generateLogicChain(a, b),
+        synergy_title: `Стартап на стыке: ${a.title?.split(' ').slice(0, 3).join(' ') || 'Идея A'} + ${b.title?.split(' ').slice(0, 3).join(' ') || 'Идея B'}`,
+        synergy_description: `Новый продукт, объединяющий подход «${a.title}» с технологией «${b.title}». Решает задачу ${a.pain_point?.[0] || 'аудитории'} через ${tech.join('+') || 'интеграцию'}.`,
+        mvp_scenario: `Месяц 1: прототип для ${audA}. Месяц 2: интеграция с ${tech[0] || 'API'}. Месяц 3: пилот с 50 пользователями.`,
+        logic_chain: `${a.title} валидирует спрос у ${audA}. ${b.title} даёт технологию ${tech.join(', ')}. Вместе: продукт, который закрывает боль «${a.pain_point?.[0] || 'X'}» для «${audB}».`,
         classification: {
             vertical,
-            core_tech: tech,
-            target_audience: `${a.target_audience || 'Аудитория A'} + ${b.target_audience || 'Аудитория B'}`,
+            core_tech: tech.length > 0 ? tech : ['AI'],
+            target_audience: `${audA} + ${audB}`,
             business_model: a.business_model || b.business_model || 'SaaS'
         },
-        thinking_models: { blue_ocean_errc: errc, knowledge_transfer: kt, scamper, jobs_to_be_done: jtbd },
-        defensibility: generateDefensibility(a, b),
-        ai_trend_forecast: aiForecast,
-        contrarian_bet: contrarian,
-        anti_pattern_check: antiPattern,
+        thinking_models: {
+            blue_ocean_errc: `Eliminate: посредники между ${audA} и ${audB}. Create: прямой продукт.`,
+            knowledge_transfer: `Экспертиза из ${a.vertical || 'домена A'} переносится в ${b.vertical || 'домен B'}.`,
+            scamper: `Combine: ${audA} × ${audB}. Adapt: ${a.business_model || 'модель A'} → ${b.business_model || 'модель B'}.`,
+            jobs_to_be_done: `Пользователь хочет «${a.pain_point?.[0] || 'X'}» и «${b.pain_point?.[0] || 'Y'}» — одним продуктом.`
+        },
+        defensibility: {
+            competitive_moat: `Сетевой эффект: каждый новый пользователь усиливает ценность для ${audA} и ${audB}.`,
+            unfair_advantage: `Уникальная комбинация ${tech.join('+')} на стыке ${a.vertical || 'A'} и ${b.vertical || 'B'}.`
+        },
+        ai_trend_forecast: `ИИ автоматизирует рутину в этом сегменте. Выиграет тот, кто построит data moat.`,
+        contrarian_bet: `Рынок считает ${a.vertical || 'A'} и ${b.vertical || 'B'} разными рынками. Мы считаем — это один недооценённый рынок.`,
+        anti_pattern_check: `Продукт решает конкретную задачу: «${a.pain_point?.[0] || 'X'} + ${b.pain_point?.[0] || 'Y'}» — не платформа, не агрегатор.`,
         scores: {
             total: Math.round(score * 10) / 10,
             blue_ocean: Math.round(Math.min(score * 0.8 + 2, 10)),
             knowledge_transfer: Math.round(Math.min(score * 0.7 + 3, 10))
         }
+    }
+}
+
+export async function builderBuild(a: Idea, b: Idea): Promise<BuilderResult | null> {
+    if (!sanityCheck(a, b)) return null
+
+    const score = calculateConsensusSynergyScore(a, b)
+    const tech = combineTech(a, b)
+
+    try {
+        const apiKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY
+        if (!apiKey) return deterministicFallback(a, b, score)
+
+        const prompt = FALLBACK_BUILDER_PROMPT
+            .replace('{titleA}', a.title || '')
+            .replace('{descA}', (a.description || '').slice(0, 500))
+            .replace('{audienceA}', a.target_audience || 'не указана')
+            .replace('{techA}', (a.core_tech || []).join(', ') || 'не указана')
+            .replace('{bizA}', a.business_model || 'не указана')
+            .replace('{painA}', (a.pain_point || [])[0] || 'не указана')
+            .replace('{titleB}', b.title || '')
+            .replace('{descB}', (b.description || '').slice(0, 500))
+            .replace('{audienceB}', b.target_audience || 'не указана')
+            .replace('{techB}', (b.core_tech || []).join(', ') || 'не указана')
+            .replace('{bizB}', b.business_model || 'не указана')
+            .replace('{painB}', (b.pain_point || [])[0] || 'не указана')
+
+        const raw = await askGemini(prompt)
+        const jsonMatch = raw.match(/\{[\s\S]*\}/)
+        if (!jsonMatch) return deterministicFallback(a, b, score)
+
+        const ai = JSON.parse(jsonMatch[0])
+
+        return {
+            synergy_title: ai.product_name || deterministicFallback(a, b, score).synergy_title,
+            synergy_description: ai.description || ai.elevator_pitch || deterministicFallback(a, b, score).synergy_description,
+            mvp_scenario: ai.mvp_scope || deterministicFallback(a, b, score).mvp_scenario,
+            logic_chain: ai.logic_chain || deterministicFallback(a, b, score).logic_chain,
+            classification: {
+                vertical: ai.vertical || a.vertical || b.vertical || 'Технологии',
+                core_tech: ai.core_tech || combineTech(a, b),
+                target_audience: ai.target_audience || `${a.target_audience || ''} + ${b.target_audience || ''}`,
+                business_model: ai.monetization || a.business_model || b.business_model || 'SaaS'
+            },
+            thinking_models: {
+                blue_ocean_errc: deterministicFallback(a, b, score).thinking_models.blue_ocean_errc,
+                knowledge_transfer: deterministicFallback(a, b, score).thinking_models.knowledge_transfer,
+                scamper: deterministicFallback(a, b, score).thinking_models.scamper,
+                jobs_to_be_done: deterministicFallback(a, b, score).thinking_models.jobs_to_be_done
+            },
+            defensibility: {
+                competitive_moat: ai.moat || deterministicFallback(a, b, score).defensibility.competitive_moat,
+                unfair_advantage: ai.unfair_advantage || deterministicFallback(a, b, score).defensibility.unfair_advantage
+            },
+            ai_trend_forecast: ai.ai_trend || deterministicFallback(a, b, score).ai_trend_forecast,
+            contrarian_bet: ai.contrarian_bet || deterministicFallback(a, b, score).contrarian_bet,
+            anti_pattern_check: ai.anti_pattern_check || deterministicFallback(a, b, score).anti_pattern_check,
+            scores: {
+                total: ai.scores?.total || deterministicFallback(a, b, score).scores.total,
+                blue_ocean: ai.scores?.blue_ocean || deterministicFallback(a, b, score).scores.blue_ocean,
+                knowledge_transfer: ai.scores?.knowledge_transfer || deterministicFallback(a, b, score).scores.knowledge_transfer
+            }
+        }
+    } catch {
+        return deterministicFallback(a, b, score)
     }
 }

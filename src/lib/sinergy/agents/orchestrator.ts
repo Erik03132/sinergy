@@ -44,12 +44,17 @@ function pickRandom<T>(items: T[], count: number): T[] {
  * 3. Эволюционные катализаторы (30% случаев) — для свежих идей
  */
 function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
-    const n = ideas.length
+    // Предпочитаем структурированные идеи
+    const structured = ideas.filter(i =>
+        i.core_tech?.length > 0 && i.business_model && i.business_model !== 'TBD'
+    )
+    const pool = structured.length >= 4 ? structured : ideas
+    const n = pool.length
     if (n < 2) return []
 
     // 30% chance: стратегическая эволюция (идея + технологический катализатор)
     if (Math.random() < 0.3) {
-        const a = pickRandom(ideas, 1)[0]
+        const a = pickRandom(pool, 1)[0]
         const compatible = EVOLUTION_CATALYSTS.filter(c =>
             c.synergy_domains.some(d => a.vertical?.includes(d))
         )
@@ -78,8 +83,8 @@ function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
         const i = Math.floor(Math.random() * n)
         let j = Math.floor(Math.random() * n)
         if (n > 1) while (j === i) j = Math.floor(Math.random() * n)
-        const a = ideas[i]
-        const b = ideas[j]
+        const a = pool[i]
+        const b = pool[j]
 
         if (!sanityCheck(a, b)) continue
 
@@ -141,8 +146,8 @@ export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {
     for (const pair of pairs) {
         const { a, b, score } = pair
 
-        // 1. Builder ALWAYS runs (deterministic)
-        const built = builderBuild(a, b)
+        // 1. Builder ALWAYS runs (AI-powered primary, deterministic fallback)
+        const built = await builderBuild(a, b)
         if (!built) continue
 
         // 2. Run Optimist + Skeptic in parallel (if AI available)

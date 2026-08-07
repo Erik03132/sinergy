@@ -35,27 +35,34 @@ export async function optimistAnalyze(a: Idea, b: Idea): Promise<OptimistOutput>
         const apiKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY
         if (!apiKey) return deterministic
 
-        const prompt = `You are a Growth Strategist analyzing a startup synergy.
+        const prompt = `Ты — growth-стратег. Оцени синергию двух структурированных стартапов:
 
-Component A: ${a.title} — ${a.description}
-Vertical A: ${a.vertical} | Tech: ${a.core_tech?.join(', ')} | Audience: ${a.target_audience}
+СТАРТАП A:
+- Продукт: ${a.title}
+- Описание: ${a.description?.slice(0, 300) || '-'}
+- Аудитория: ${a.target_audience || '-'}
+- Технология: ${a.core_tech?.join(', ') || '-'}
+- Монетизация: ${a.business_model || '-'}
+- Проблема: ${a.pain_point?.[0] || '-'}
 
-Component B: ${b.title} — ${b.description}
-Vertical B: ${b.vertical} | Tech: ${b.core_tech?.join(', ')} | Audience: ${b.target_audience}
+СТАРТАП B:
+- Продукт: ${b.title}
+- Описание: ${b.description?.slice(0, 300) || '-'}
+- Аудитория: ${b.target_audience || '-'}
+- Технология: ${b.core_tech?.join(', ') || '-'}
+- Монетизация: ${b.business_model || '-'}
+- Проблема: ${b.pain_point?.[0] || '-'}
 
-Deterministic scores:
-- Blue Ocean Potential: ${blueOceanScore}/10
-- Knowledge Transfer: ${ktScore}/10
-- Creativity: ${creativityScore}/10
+Детерминированные оценки: Blue Ocean ${blueOceanScore}/10, Knowledge Transfer ${ktScore}/10, Creativity ${creativityScore}/10
 
-Respond with valid JSON only:
+Ответь JSON:
 {
-  "blue_ocean_analysis": "2-3 sentence analysis of blue ocean strategy for this combination",
-  "contrarian_bet": "1 sentence: what unpopular opinion drives this product?",
-  "ai_trend_forecast": "2 sentence: how will AI affect this in 5 years?"
+  "blue_ocean_analysis": "3-4 предложения: насколько свободен рынок на стыке? Кто основные конкуренты?",
+  "contrarian_bet": "1 предложение: какое непопулярное мнение стоит за этим продуктом?",
+  "ai_trend_forecast": "2-3 предложения: как ИИ изменит этот рынок через 5 лет?"
 }
 
-Language: RUSSIAN. Be specific, not generic.`
+Язык: РУССКИЙ. Будь конкретным, не общими фразами.`
 
         const raw = await askGemini(prompt, { search: false })
         const jsonMatch = raw.match(/\{[\s\S]*\}/)

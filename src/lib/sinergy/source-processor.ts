@@ -45,7 +45,7 @@ function shortHash(input: string, length: number = 8): string {
     return Math.abs(hash).toString(36).substring(0, length);
 }
 
-async function registerSource(details: any, type: 'telegram' | 'web') {
+export async function registerSource(details: any, type: 'telegram' | 'web') {
     const supabase = await createClient();
 
     // Быстрый фильтр (Уже парсили этот URL?)
@@ -204,6 +204,28 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
         if (!error) console.log(`[Processor] Saved Concept: ${idea.title} (Score: ${idea.score})`);
         else console.error("[Processor] Saving error:", error.message);
     }
+}
+
+export async function extractAndSaveBatch(
+  items: { title: string; description: string; url: string; sourceName: string }[]
+): Promise<number> {
+  let saved = 0
+  for (const item of items) {
+    try {
+      await registerSource({
+        id: shortHash(item.url, 20),
+        title: item.title,
+        text: item.description || item.title,
+        url: item.url,
+        channelHandle: item.sourceName,
+        channelTitle: item.title,
+      }, 'web')
+      saved++
+    } catch (e: any) {
+      console.error(`[extractAndSaveBatch] Failed for "${item.title.slice(0,50)}": ${e.message}`)
+    }
+  }
+  return saved
 }
 
 export async function processManualUrl(url: string, query?: string) {

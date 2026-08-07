@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { processManualUrl } from "./source-processor";
+import { processManualUrl, extractAndSaveBatch } from "./source-processor";
 import { getHNShow } from "./hackernews";
 import { getProductHuntTrending } from "./producthunt";
 import { getDevToStartupPosts } from "./devto";
@@ -217,37 +217,19 @@ export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
       }
     }
 
-    // 3. Save all items
+    // 3. AI-извлечение структуры и сохранение
     let total = 0
-    for (const item of toSave) {
-        try {
-            const { error: insertErr } = await supabase.from('ideas').insert({
-                source: 'user',
-                title: item.title.slice(0, 500),
-                description: (item.description || item.title).slice(0, 2000),
-                vertical: 'Новости',
-                core_tech: [],
-                target_audience: 'TBD',
-                business_model: 'TBD',
-                pain_point: [],
-                temporal_marker: new Date().toISOString().split('T')[0],
-                metadata: {
-                    type: item.sourceName.toLowerCase(),
-                    original_source: item.source,
-                    original_url: item.url,
-                    unique_id: shortHash(item.url, 8),
-                    auto_discovered: true,
-                    summary: item.summary || undefined,
-                }
-            })
-            if (insertErr) {
-                err(`insert err for "${item.title.slice(0, 30)}": ${insertErr.message}`)
-            } else {
-                total++
-            }
-        } catch (e: any) {
-            err(`insert ex: ${e?.message || e}`)
-        }
+    if (toSave.length > 0) {
+      err(`extracting startup structures from ${toSave.length} items via Gemini...`)
+      total = await extractAndSaveBatch(
+        toSave.map(item => ({
+          title: item.title,
+          description: (item as any).description || item.title,
+          url: item.url,
+          sourceName: item.source || item.sourceName,
+        }))
+      )
+      err(`AI-extracted and saved ${total} structured startup ideas`)
     }
 
     // 4. Channel sources

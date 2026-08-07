@@ -15,7 +15,10 @@ export async function POST(req: Request) {
         const { data: ideas, error } = await supabase
             .from('ideas')
             .select('*')
-            .not('vertical', 'eq', 'History')
+            .not('vertical', 'is', null)
+            .not('vertical', 'in', '("Новости","History")')
+            .not('business_model', 'in', '("TBD","Стартап")')
+            .not('target_audience', 'in', '("TBD","Общая")')
             .order('created_at', { ascending: false })
             .limit(500)
 
