@@ -11,7 +11,7 @@ export default function Home() {
                 <div className="space-y-4">
                     <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-neutral-900/50 border border-neutral-800 text-emerald-400 text-sm font-medium mb-4">
                         <Sparkles className="w-4 h-4" />
-                        <span>AI-Powered Startup Platform</span>
+                        <span>ИИ-платформа для стартапов</span>
                     </div>
                     <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white mb-6">
                         Sinergy <span className="text-emerald-500">App</span>
@@ -73,7 +73,7 @@ export default function Home() {
             </div>
 
             <footer className="absolute bottom-8 text-neutral-600 text-sm">
-                © 2026 Sinergy Inc. Built with Next.js & Gemini.
+                © 2026 Sinergy Inc. Собрано на Next.js & Gemini.
             </footer>
         </main>
     )

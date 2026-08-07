@@ -43,17 +43,17 @@ export default function MyIdeasPage() {
 
     return (
         <div className="container mx-auto max-w-2xl py-12 px-4">
-            <h1 className="text-2xl font-bold mb-8 text-neutral-100">My Startup Ideas</h1>
+            <h1 className="text-2xl font-bold mb-8 text-neutral-100">Мои идеи</h1>
 
             <form onSubmit={handleSubmit} className="space-y-6 bg-neutral-900/50 p-6 rounded-xl border border-neutral-800 backdrop-blur-sm">
                 <div className="space-y-2">
                     <label htmlFor="title" className="text-sm font-medium text-neutral-300">
-                        Title
+                        Название
                     </label>
                     <input
                         id="title"
                         type="text"
-                        placeholder="e.g. AI-powered Dog Walker"
+                        placeholder="Например: ИИ-сервис для выгула собак"
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         className="w-full bg-neutral-800 border-neutral-700 text-neutral-100 rounded-lg focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all p-3"
@@ -63,19 +63,19 @@ export default function MyIdeasPage() {
 
                 <div className="space-y-2">
                     <label htmlFor="description" className="text-sm font-medium text-neutral-300">
-                        Description
+                        Описание
                     </label>
                     <textarea
                         id="description"
                         rows={5}
-                        placeholder="Describe your idea in detail..."
+                        placeholder="Опишите вашу идею подробно..."
                         value={description}
                         onChange={(e) => setDescription(e.target.value)}
                         className="w-full bg-neutral-800 border-neutral-700 text-neutral-100 rounded-lg focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500 transition-all p-3 resize-none"
                         disabled={isLoading}
                     />
                     <p className="text-xs text-neutral-500">
-                        We'll automatically classify this idea using Gemini.
+                        Мы автоматически классифицируем идею с помощью Gemini.
                     </p>
                 </div>
 
@@ -87,10 +87,10 @@ export default function MyIdeasPage() {
                     {isLoading ? (
                         <>
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            Analyzing with Gemini...
+                            Анализируем через Gemini...
                         </>
                     ) : (
-                        'Save Idea'
+                        'Сохранить идею'
                     )}
                 </button>
             </form>

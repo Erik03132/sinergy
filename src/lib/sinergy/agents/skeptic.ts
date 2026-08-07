@@ -34,7 +34,7 @@ export async function skepticValidate(a: Idea, b: Idea, synergyTitle: string, sy
         return {
             ...deterministic,
             is_viable: false,
-            anti_pattern_check: 'Обнаружен anti-pattern: продукт звучит как общая платформа/агрегатор.'
+            anti_pattern_check: 'Обнаружен антипаттерн: продукт звучит как общая платформа/агрегатор.'
         }
     }
 
@@ -109,7 +109,7 @@ function generateAntiPatternCheck(title: string, desc: string): string {
     if (found.length > 0) {
         return `Обнаружены подозрительные паттерны: ${found.join(', ')}. Убедитесь, что продукт решает конкретную задачу.`
     }
-    return 'Anti-pattern check пройден: продукт выглядит конкретным, а не абстрактной платформой.'
+    return 'Проверка на антипаттерн пройдена: продукт выглядит конкретным, а не абстрактной платформой.'
 }
 
 function generateDeterministicCompetitors(a: Idea, b: Idea): string {

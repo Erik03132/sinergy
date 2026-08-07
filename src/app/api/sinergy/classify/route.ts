@@ -106,7 +106,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (!supabase) {
-            return NextResponse.json({ error: 'Database configuration error (No Client Available)' }, { status: 500 })
+            return NextResponse.json({ error: 'Ошибка конфигурации базы данных (клиент недоступен)' }, { status: 500 })
         }
 
         // Check for duplicates
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
 
         if (error) {
             console.error('❌ Supabase error:', error)
-            return NextResponse.json({ error: `Failed to save idea: ${error.message}` }, { status: 500 })
+            return NextResponse.json({ error: `Не удалось сохранить идею: ${error.message}` }, { status: 500 })
         }
 
         console.log(`✅ Idea saved successfully: ${data.id}`)
@@ -152,8 +152,8 @@ export async function POST(req: NextRequest) {
         console.error('API Error:', error)
         // Expose error message for easier debugging in production
         return NextResponse.json({
-            error: 'Internal Server Error',
-            details: error.message || 'Unknown error',
+            error: 'Внутренняя ошибка сервера',
+            details: error.message || 'Неизвестная ошибка',
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         }, { status: 500 })
     }

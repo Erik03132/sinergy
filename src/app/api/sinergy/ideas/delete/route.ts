@@ -7,7 +7,7 @@ export async function DELETE(request: Request) {
         const { id } = await request.json()
 
         if (!id) {
-            return NextResponse.json({ error: 'ID required' }, { status: 400 })
+            return NextResponse.json({ error: 'Требуется ID' }, { status: 400 })
         }
 
         const { data, error } = await supabase
@@ -26,7 +26,7 @@ export async function DELETE(request: Request) {
             // We return 200 OK with count 0 to UI so it can remove it from view anyway? 
             // No, UI expects success. Let's return 404 so UI knows it "wasn't there". 
             // OR if user sees it, it means UI is stale.
-            return NextResponse.json({ error: 'Item not found or already deleted' }, { status: 404 })
+            return NextResponse.json({ error: 'Элемент не найден или уже удалён' }, { status: 404 })
         }
 
         return NextResponse.json({ status: 'success', count: data.length })

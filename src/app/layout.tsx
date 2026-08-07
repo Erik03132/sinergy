@@ -9,7 +9,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-    title: 'My App',
+    title: 'Sinergy',
     description: 'Создано на основе nextjs-starter',
 }
 

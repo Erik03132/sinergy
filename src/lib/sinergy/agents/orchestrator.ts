@@ -17,12 +17,12 @@ import { optimistAnalyze, OptimistOutput } from './optimist'
 import { skepticValidate, SkepticOutput } from './skeptic'
 
 const EVOLUTION_CATALYSTS = [
-    { title: 'Agentic RAG with Memory', description: 'ИИ-агент с долговременной памятью и контекстом пользователя.', maturity: 8, synergy_domains: ['EdTech', 'HealthTech', 'LegalTech', 'ProductivityTools'] },
-    { title: 'Multi-Modal AI (Vision + Text + Voice)', description: 'Обработка изображений, текста и голоса в едином потоке.', maturity: 7, synergy_domains: ['Healthcare', 'Education', 'E-commerce', 'Entertainment'] },
-    { title: 'Autonomous Workflow Orchestration', description: 'Самообучающаяся автоматизация бизнес-процессов через API.', maturity: 6, synergy_domains: ['FinTech', 'Operations', 'HR', 'Logistics'] },
-    { title: 'Real-Time Personalization Engine', description: 'Динамическая адаптация UX на основе поведенческих паттернов.', maturity: 8, synergy_domains: ['E-commerce', 'Media', 'SaaS', 'Marketing'] },
-    { title: 'Blockchain-based Trust Layer', description: 'Верифицируемая история изменений для критичных данных.', maturity: 5, synergy_domains: ['Healthcare', 'Supply Chain', 'Legal', 'FinTech'] },
-    { title: 'Predictive Analytics with Causal AI', description: 'Не только прогноз, но и объяснение причинно-следственных связей.', maturity: 6, synergy_domains: ['FinTech', 'Marketing', 'Operations', 'Analytics'] }
+    { title: 'ИИ-агент с долговременной памятью (RAG)', description: 'ИИ-агент с долговременной памятью и контекстом пользователя.', maturity: 8, synergy_domains: ['EdTech', 'HealthTech', 'LegalTech', 'ProductivityTools'] },
+    { title: 'Мультимодальный ИИ (Зрение + Текст + Голос)', description: 'Обработка изображений, текста и голоса в едином потоке.', maturity: 7, synergy_domains: ['Healthcare', 'Education', 'E-commerce', 'Entertainment'] },
+    { title: 'Автономная оркестрация бизнес-процессов', description: 'Самообучающаяся автоматизация бизнес-процессов через API.', maturity: 6, synergy_domains: ['FinTech', 'Operations', 'HR', 'Logistics'] },
+    { title: 'Движок персонализации в реальном времени', description: 'Динамическая адаптация UX на основе поведенческих паттернов.', maturity: 8, synergy_domains: ['E-commerce', 'Media', 'SaaS', 'Marketing'] },
+    { title: 'Слой доверия на блокчейне', description: 'Верифицируемая история изменений для критичных данных.', maturity: 5, synergy_domains: ['Healthcare', 'Supply Chain', 'Legal', 'FinTech'] },
+    { title: 'Предиктивная аналитика с каузальным ИИ', description: 'Не только прогноз, но и объяснение причинно-следственных связей.', maturity: 6, synergy_domains: ['FinTech', 'Marketing', 'Operations', 'Analytics'] }
 ]
 
 interface PairCandidate {
@@ -58,13 +58,13 @@ function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
             ...catalyst,
             id: `catalyst-${catalyst.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}`,
             core_tech: ['AI', 'Cloud', 'API'],
-            business_model: 'Technology Enhancement',
+            business_model: 'Технологическое усиление',
             vertical: catalyst.synergy_domains[0] || 'AI-infrastructure',
-            target_audience: 'Tech companies',
-            pain_point: ['Need innovation catalyst'],
+            target_audience: 'Технологические компании',
+            pain_point: ['Нужен катализатор инноваций'],
             created_at: new Date().toISOString(),
             source: 'synergy',
-            temporal_marker: 'Now',
+            temporal_marker: 'Сейчас',
             description: catalyst.description
         }
         return [{ a, b, score: 5 + catalyst.maturity * 0.5 }]
@@ -159,7 +159,7 @@ export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {
         // 3. Merge into SynergyResult
         const result: any = {
             status: 'synergy_found' as const,
-            mode: b.id?.startsWith('catalyst-') ? 'Strategic Evolution' : 'Hybrid Synthesis',
+            mode: b.id?.startsWith('catalyst-') ? 'Стратегическая эволюция' : 'Гибридный синтез',
             idea_id: undefined,
             synergy_title: built.synergy_title,
             synergy_description: built.synergy_description,
@@ -218,19 +218,19 @@ export async function saveSynergy(supabase: any, result: SynergyResult, a: Idea,
         }
     })
 
-    const newIdea = {
-        source: 'synergy',
-        source_type: 'synergy',
-        title: result.synergy_title,
-        description: result.synergy_description || '',
-        is_favorite: false,
-        is_synergy: true,
-        vertical: result.classification?.vertical || 'Other',
-        core_tech: result.classification?.core_tech || [],
-        target_audience: result.classification?.target_audience || 'General',
-        business_model: result.classification?.business_model || 'SaaS',
-        pain_point: ['Синтезировано блендером'],
-        temporal_marker: 'Now',
+        const newIdea = {
+            source: 'synergy',
+            source_type: 'synergy',
+            title: result.synergy_title,
+            description: result.synergy_description || '',
+            is_favorite: false,
+            is_synergy: true,
+            vertical: result.classification?.vertical || 'Другое',
+            core_tech: result.classification?.core_tech || [],
+            target_audience: result.classification?.target_audience || 'Общая',
+            business_model: result.classification?.business_model || 'SaaS',
+            pain_point: ['Синтезировано блендером'],
+            temporal_marker: 'Сейчас',
         metadata: {
             logic_chain: result.logic_chain,
             score: scores?.total,

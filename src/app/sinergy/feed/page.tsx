@@ -3,7 +3,7 @@
 
 import React, { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Newspaper, ExternalLink, Library, RefreshCw, Loader2, FileText } from 'lucide-react'
+import { Newspaper, ExternalLink, Library, RefreshCw, Loader2, FileText, Languages } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -20,6 +20,7 @@ export default function NewsFeedPage() {
     const [news, setNews] = useState<any[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [isRefreshing, setIsRefreshing] = useState(false)
+    const [isTranslating, setIsTranslating] = useState(false)
     const [lastUpdate, setLastUpdate] = useState<string | null>(null)
     const supabase = createClient()
     const router = useRouter()
@@ -82,11 +83,41 @@ export default function NewsFeedPage() {
 
             const data = await res.json()
             toast.success(`Найдено ${data.count} новых идей!`)
-            await fetchNews() // Reload list
+            await fetchNews()
+
+            if (data.count > 0) {
+                setIsTranslating(true)
+                toast.info("Переводим на русский...")
+                try {
+                    const trRes = await fetch('/api/sinergy/feed/refresh?retranslate=true', { method: 'POST' })
+                    const trData = await trRes.json()
+                    toast.success(`Переведено ${trData.updated || 0} записей!`)
+                    await fetchNews()
+                } catch {
+                    toast.error("Перевод не удался. Нажмите кнопку «Перевести» для повторной попытки.")
+                } finally {
+                    setIsTranslating(false)
+                }
+            }
         } catch (e) {
             toast.error("Ошибка при обновлении ленты.")
         } finally {
             setIsRefreshing(false)
+        }
+    }
+
+    const handleRetranslate = async () => {
+        setIsTranslating(true)
+        toast.info("Переводим существующий контент на русский... Это займет до 30 секунд.")
+        try {
+            const res = await fetch('/api/sinergy/feed/refresh?retranslate=true', { method: 'POST' })
+            const data = await res.json()
+            toast.success(`Переведено ${data.updated || 0} записей!`)
+            await fetchNews()
+        } catch (e) {
+            toast.error("Ошибка при переводе.")
+        } finally {
+            setIsTranslating(false)
         }
     }
 
@@ -105,7 +136,7 @@ export default function NewsFeedPage() {
 
             if (!res.ok) {
                 const errorData = await res.json()
-                throw new Error(errorData.error || 'Failed to save')
+                throw new Error(errorData.error || 'Не удалось сохранить')
             }
 
             const result = await res.json()
@@ -152,6 +183,20 @@ export default function NewsFeedPage() {
                         <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
                     )}
                     {isRefreshing ? 'Поиск...' : 'Обновить сейчас'}
+                </button>
+
+                <button
+                    onClick={handleRetranslate}
+                    disabled={isTranslating || isRefreshing}
+                    className="w-full sm:w-auto group relative px-4 py-2.5 bg-transparent border border-amber-500/50 hover:border-amber-500 text-amber-400 hover:text-amber-300 rounded-xl shadow-lg shadow-amber-900/10 hover:shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-2 font-medium text-sm"
+                >
+                    <div className="absolute inset-0 bg-amber-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
+                    {isTranslating ? (
+                        <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+                    ) : (
+                        <Languages className="w-4 h-4" />
+                    )}
+                    {isTranslating ? 'Перевод...' : 'Перевести'}
                 </button>
             </div>
 

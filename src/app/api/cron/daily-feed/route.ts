@@ -13,7 +13,7 @@ export async function GET(req: Request) {
     // Проверка секрета для защиты от посторонних вызовов
     const authHeader = req.headers.get('authorization')
     if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
-        return new Response('Unauthorized', { status: 401 })
+        return new Response('Не авторизован', { status: 401 })
     }
 
     const supabase = await createClient()

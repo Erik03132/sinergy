@@ -7,7 +7,7 @@ export async function POST(request: Request) {
         const { idea } = await request.json()
 
         if (!idea) {
-            return NextResponse.json({ error: 'Data required' }, { status: 400 })
+            return NextResponse.json({ error: 'Данные обязательны' }, { status: 400 })
         }
 
         // Check for duplicates
@@ -24,15 +24,15 @@ export async function POST(request: Request) {
 
         // Clone the idea with a new source to mark it as "User Saved"
         const { data, error } = await supabase.from('ideas').insert({
-            title: idea.title || 'Untitled',
+            title: idea.title || 'Без названия',
             description: idea.description || '',
             source: 'user',
-            vertical: idea.vertical || 'News',
+            vertical: idea.vertical || 'Новости',
             core_tech: idea.core_tech || [],
-            target_audience: idea.target_audience || 'General',
-            business_model: idea.business_model || 'Unknown',
+            target_audience: idea.target_audience || 'Общая',
+            business_model: idea.business_model || 'Не указана',
             pain_point: idea.pain_point || [],
-            temporal_marker: 'Saved from Feed',
+            temporal_marker: 'Сохранено из ленты',
             original_url: idea.original_url || 'N/A',
             is_synergy: false,
             // Store lineage
@@ -52,6 +52,6 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error('Error saving idea:', error)
-        return NextResponse.json({ error: error.message || 'Server Error' }, { status: 500 })
+        return NextResponse.json({ error: error.message || 'Ошибка сервера' }, { status: 500 })
     }
 }

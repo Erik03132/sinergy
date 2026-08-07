@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
             .in('id', [ideaAId, ideaBId])
 
         if (error || !ideas || ideas.length !== 2) {
-            return NextResponse.json({ error: 'Ideas not found' }, { status: 404 })
+            return NextResponse.json({ error: 'Идеи не найдены' }, { status: 404 })
         }
 
         const [ideaA, ideaB] = ideas
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
             validationResult = JSON.parse(cleanJson)
         } catch (e) {
             console.error('Failed to parse validation result:', cleanJson)
-            return NextResponse.json({ error: 'Validation parsing failed' }, { status: 500 })
+            return NextResponse.json({ error: 'Не удалось обработать результат валидации' }, { status: 500 })
         }
 
         return NextResponse.json(validationResult)
@@ -105,6 +105,6 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: error.errors }, { status: 400 })
         }
         console.error('Validation API Error:', error)
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+        return NextResponse.json({ error: 'Внутренняя ошибка сервера' }, { status: 500 })
     }
 }

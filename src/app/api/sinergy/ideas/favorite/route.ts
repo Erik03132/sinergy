@@ -7,7 +7,7 @@ export async function POST(request: Request) {
         const { id, is_favorite } = await request.json()
 
         if (!id) {
-            return NextResponse.json({ error: 'ID required' }, { status: 400 })
+            return NextResponse.json({ error: 'Требуется ID' }, { status: 400 })
         }
 
         const { data, error } = await supabase

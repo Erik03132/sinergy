@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
         const { ideaId, title, description, additionalContext } = body
 
         if (!ideaId || !title || !description) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+            return NextResponse.json({ error: 'Отсутствуют обязательные поля' }, { status: 400 })
         }
 
         const supabase = await createClient()
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
             analysisData = JSON.parse(cleanJson)
         } catch (e) {
             console.error('Failed to parse analysis JSON:', cleanJson)
-            return NextResponse.json({ error: 'Failed to generate analysis' }, { status: 500 })
+            return NextResponse.json({ error: 'Не удалось сгенерировать анализ' }, { status: 500 })
         }
 
         const analysisWithStatus: DetailedAnalysis = {
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
                 : 'Не удалось сгенерировать анализ. Попробуйте ещё раз.'
 
         return NextResponse.json({
-            error: 'Analysis failed',
+            error: 'Анализ не удался',
             details: userMessage
         }, { status: 500 })
     }

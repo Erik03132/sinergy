@@ -1,6 +1,7 @@
 
 import { createClient } from "../supabase/server";
 import { askGemini } from "../ai/gemini";
+import { translateBatch } from "../ai/translate";
 import { extractTelegramInfo, getRecentTelegramPosts } from "./telegram";
 import * as cheerio from 'cheerio';
 import { BANNED_KEYWORDS } from "./constants";
@@ -136,6 +137,24 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
 
     if (!Array.isArray(extractedIdeas)) extractedIdeas = [extractedIdeas];
 
+    // Гарантированный перевод: если Gemini вернул английский — переводим
+    if (extractedIdeas.length > 0) {
+      try {
+        const toTranslate = extractedIdeas.map((idea: any) => ({
+          title: idea.title,
+          description: idea.summary || idea.title,
+        }))
+        const translated = await translateBatch(toTranslate)
+        for (let idx = 0; idx < extractedIdeas.length; idx++) {
+          if (translated[idx]?.title) extractedIdeas[idx].title = translated[idx].title
+          if (translated[idx]?.description) extractedIdeas[idx].summary = translated[idx].description
+        }
+        console.log(`[Processor] Translated ${extractedIdeas.length} ideas to Russian`)
+      } catch (e: any) {
+        console.warn(`[Processor] Translation failed, using originals: ${e.message}`)
+      }
+    }
+
     for (const idea of extractedIdeas) {
         if (!idea.title || !idea.summary) continue;
 
@@ -161,18 +180,18 @@ async function registerSource(details: any, type: 'telegram' | 'web') {
             source: 'automatic',
             title: idea.title,
             description: idea.summary,
-            vertical: idea.vertical || 'News',
+            vertical: idea.vertical || 'Новости',
             original_url: details.url,
             is_synergy: false,
             core_tech: idea.core_tech ? [idea.core_tech] : [],
-            target_audience: idea.target_audience || 'General',
-            business_model: idea.business_model || 'Startup',
+            target_audience: idea.target_audience || 'Общая',
+            business_model: idea.business_model || 'Стартап',
             pain_point: idea.pain_point ? [idea.pain_point] : [],
             temporal_marker: new Date().toISOString().split('T')[0],
             metadata: {
                 external_id: externalId,
                 type: type,
-                author: details.channelTitle || details.channelHandle || 'Web Source',
+                author: details.channelTitle || details.channelHandle || 'Веб-источник',
                 thumbnail: details.imageUrl || null,
                 is_extracted: true,
                 scanned_at: new Date().toISOString(),

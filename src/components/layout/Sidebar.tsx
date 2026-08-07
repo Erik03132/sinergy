@@ -16,7 +16,7 @@ export function Sidebar() {
                 <div className="text-2xl font-bold bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">
                     SINERGY
                 </div>
-                <div className="text-xs text-neutral-500 mt-1">Sinergy Startup Engine</div>
+                <div className="text-xs text-neutral-500 mt-1">Движок стартап-идей</div>
             </div>
 
             <nav className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -49,7 +49,7 @@ export function Sidebar() {
 
             <div className="p-4 border-t border-neutral-800">
                 <div className="bg-neutral-900/50 rounded-lg p-3 text-xs text-neutral-500 text-center">
-                    Sprint 3
+                    Спринт 3
                 </div>
             </div>
         </aside>

@@ -44,7 +44,7 @@ export default function FindSynergyPage() {
             setResult(data)
         } catch (error) {
             console.error(error)
-            toast.error('Failed to find synergy. Please try again.')
+            toast.error('Не удалось найти синергию. Попробуйте ещё раз.')
         } finally {
             setIsLoading(false)
         }
@@ -61,15 +61,15 @@ export default function FindSynergyPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     newIdea: {
-                        title: `Synergy: ${result.components[0].title} + ${result.components[1].title}`,
-                        description: `Hypothesis: ${result.hypothesis}\n\nLogic Chain: ${result.logic_chain}`,
+                        title: `Синергия: ${result.components[0].title} + ${result.components[1].title}`,
+                        description: `Гипотеза: ${result.hypothesis}\n\nЛогическая цепочка: ${result.logic_chain}`,
                         source: 'synergy',
                         vertical: result.components[0].vertical, // Inherit from parent
                         core_tech: [...result.components[0].core_tech, ...result.components[1].core_tech],
-                        target_audience: 'Combined Audience',
-                        business_model: 'Hybrid',
-                        pain_point: ['Unmet Synergy'],
-                        temporal_marker: 'Now',
+                        target_audience: 'Объединённая аудитория',
+                        business_model: 'Гибридная модель',
+                        pain_point: ['Нереализованная синергия'],
+                        temporal_marker: 'Сейчас',
                         is_synergy: true,
                         metadata: {
                             parents: [result.components[0], result.components[1]],
@@ -88,7 +88,7 @@ export default function FindSynergyPage() {
 
         } catch (error) {
             console.error('Failed to save details:', error)
-            toast.error('Failed to save. Try again.')
+            toast.error('Не удалось сохранить. Попробуйте снова.')
             setIsSaving(false)
         }
     }
@@ -126,13 +126,13 @@ export default function FindSynergyPage() {
 
             {result && result.status === 'no_more_synergy' && (
                 <div className="text-center space-y-4">
-                    <div className="text-2xl font-semibold text-neutral-300">No more synergies found</div>
-                    <p className="text-neutral-500">Try adding more ideas to the archive.</p>
+                    <div className="text-2xl font-semibold text-neutral-300">Синергии не найдены</div>
+                    <p className="text-neutral-500">Добавьте больше идей в архив.</p>
                     <button
                         onClick={findNextSynergy}
                         className="text-emerald-500 hover:text-emerald-400 flex items-center gap-2 mx-auto"
                     >
-                        <RefreshCw className="w-4 h-4" /> Try again
+                        <RefreshCw className="w-4 h-4" /> Попробовать снова
                     </button>
                 </div>
             )}
@@ -181,8 +181,8 @@ export default function FindSynergyPage() {
                                         {result.synergy_score}
                                     </div>
                                     <div className="text-xs text-neutral-500 flex flex-col">
-                                        <span>SYNERGY</span>
-                                        <span>SCORE</span>
+                                        <span>СИНЕРГИЯ</span>
+                                        <span>ОЦЕНКА</span>
                                     </div>
                                 </div>
 
@@ -197,13 +197,13 @@ export default function FindSynergyPage() {
                                         ) : (
                                             <FileText className="w-4 h-4" />
                                         )}
-                                        Details
+                                        Подробнее
                                     </button>
                                     <button
                                         onClick={findNextSynergy}
                                         className="flex items-center gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors shadow-lg shadow-emerald-900/20"
                                     >
-                                        Next
+                                        Далее
                                         <ArrowRight className="w-4 h-4" />
                                     </button>
                                 </div>
@@ -227,13 +227,13 @@ export default function FindSynergyPage() {
                         <div className="p-8 space-y-8">
                             <h2 className="text-2xl font-bold text-white flex items-center gap-2">
                                 <Sparkles className="w-6 h-6 text-purple-400" />
-                                Idea Validation
+                                Валидация идеи
                             </h2>
 
                             {isValidating ? (
                                 <div className="flex flex-col items-center justify-center py-12 space-y-4">
                                     <Loader2 className="w-10 h-10 text-purple-500 animate-spin" />
-                                    <p className="text-neutral-400 animate-pulse">Researching market with Perplexity...</p>
+                                    <p className="text-neutral-400 animate-pulse">Исследуем рынок через Perplexity...</p>
                                 </div>
                             ) : validationResult ? (
                                 <div className="space-y-6 animate-in fade-in zoom-in-95 duration-300">
@@ -241,7 +241,7 @@ export default function FindSynergyPage() {
                                     {/* Stats Grid */}
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
-                                            <div className="text-xs text-neutral-500 uppercase mb-1">Budget Estimate</div>
+                                            <div className="text-xs text-neutral-500 uppercase mb-1">Оценка бюджета</div>
                                             <div className="text-lg font-semibold text-neutral-200">
                                                 {validationResult.budget.range}
                                             </div>
@@ -250,9 +250,9 @@ export default function FindSynergyPage() {
                                             </div>
                                         </div>
                                         <div className="bg-neutral-950 p-4 rounded-xl border border-neutral-800">
-                                            <div className="text-xs text-neutral-500 uppercase mb-1">MVP Timeline</div>
+                                            <div className="text-xs text-neutral-500 uppercase mb-1">Сроки MVP</div>
                                             <div className="text-lg font-semibold text-neutral-200">
-                                                {validationResult.mvp_timeline.months} Months
+                                                {validationResult.mvp_timeline.months} Месяцев
                                             </div>
                                             <div className="text-xs text-neutral-500 mt-1">
                                                 {validationResult.mvp_timeline.comment}
@@ -265,7 +265,7 @@ export default function FindSynergyPage() {
                                         <div className="space-y-2">
                                             <div className="flex items-center gap-2 text-sm font-medium text-neutral-300">
                                                 <AlertTriangle className="w-4 h-4 text-orange-400" />
-                                                Competition ({validationResult.competition.level})
+                                                Конкуренция ({validationResult.competition.level})
                                             </div>
                                             <ul className="text-sm text-neutral-400 space-y-1 list-disc list-inside">
                                                 {validationResult.competition.examples.map((ex, i) => (
@@ -280,7 +280,7 @@ export default function FindSynergyPage() {
                                             <div>
                                                 <div className="flex items-center gap-2 text-sm font-medium text-neutral-300 mb-1">
                                                     <TrendingUp className="w-4 h-4 text-blue-400" />
-                                                    Trend
+                                                    Тренд
                                                 </div>
                                                 <div className="text-sm text-neutral-400 capitalize">
                                                     {validationResult.trend.direction} - {validationResult.trend.comment}
@@ -289,7 +289,7 @@ export default function FindSynergyPage() {
                                             <div>
                                                 <div className="flex items-center gap-2 text-sm font-medium text-neutral-300 mb-1">
                                                     <CheckCircle2 className="w-4 h-4 text-green-400" />
-                                                    Legal Risk
+                                                    Юридический риск
                                                 </div>
                                                 <div className="text-sm text-neutral-400 capitalize">
                                                     {validationResult.legal.risk} - {validationResult.legal.comment}
@@ -300,7 +300,7 @@ export default function FindSynergyPage() {
 
                                 </div>
                             ) : (
-                                <div className="text-red-400 text-center">Validation failed.</div>
+                                <div className="text-red-400 text-center">Валидация не удалась.</div>
                             )}
                         </div>
                     </div>

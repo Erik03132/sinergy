@@ -353,19 +353,19 @@ export default function AnalysisPage() {
                         <StatCard
                             label="TAM (Общий рынок)"
                             value={analysis.market.tam}
-                            sub="Total Addressable Market"
+                            sub="Общий адресуемый рынок"
                             icon={<BarChart3 className="w-4 h-4 text-blue-400" />}
                         />
                         <StatCard
                             label="SAM (Доступный)"
                             value={analysis.market.sam}
-                            sub="Serviceable Available Market"
+                            sub="Доступный обслуживаемый рынок"
                             icon={<Target className="w-4 h-4 text-purple-400" />}
                         />
                         <StatCard
                             label="SOM (Реальный)"
                             value={analysis.market.som}
-                            sub="Serviceable Obtainable Market"
+                            sub="Реально достижимый рынок"
                             icon={<Receipt className="w-4 h-4 text-emerald-400" />}
                         />
                     </div>

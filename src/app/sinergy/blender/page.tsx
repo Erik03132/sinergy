@@ -172,11 +172,11 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
             <div className="absolute top-4 right-4 z-20">
                 <span className={cn(
                     "text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-tighter",
-                    result.mode === "Strategic Evolution"
+                    result.mode === "Стратегическая эволюция"
                         ? "bg-amber-500/10 text-amber-500 border-amber-500/30"
                         : "bg-blue-500/10 text-blue-500 border-blue-500/30"
                 )}>
-                    {result.mode === "Strategic Evolution" ? "Эволюция" : "Синтез"}
+                    {result.mode === "Стратегическая эволюция" ? "Эволюция" : "Синтез"}
                 </span>
             </div>
 
@@ -228,10 +228,10 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                             <div className="bg-blue-500/5 p-3 rounded-xl border border-blue-500/10">
                                 <h3 className="text-[9px] uppercase font-black text-blue-400 mb-1 tracking-widest">Защита бизнеса</h3>
                                 <p className="text-[11px] text-neutral-400 leading-tight mb-1">
-                                    <span className="text-blue-300/50">Moat:</span> {typeof result.defensibility.competitive_moat === 'object' ? JSON.stringify(result.defensibility.competitive_moat) : result.defensibility.competitive_moat}
+                                    <span className="text-blue-300/50">Ров:</span> {typeof result.defensibility.competitive_moat === 'object' ? JSON.stringify(result.defensibility.competitive_moat) : result.defensibility.competitive_moat}
                                 </p>
                                 <p className="text-[11px] text-neutral-400 leading-tight">
-                                    <span className="text-blue-300/50">Adv:</span> {typeof result.defensibility.unfair_advantage === 'object' ? JSON.stringify(result.defensibility.unfair_advantage) : result.defensibility.unfair_advantage}
+                                    <span className="text-blue-300/50">Преим:</span> {typeof result.defensibility.unfair_advantage === 'object' ? JSON.stringify(result.defensibility.unfair_advantage) : result.defensibility.unfair_advantage}
                                 </p>
                             </div>
                         )}
@@ -248,7 +248,7 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                             </span>
                         </div>
                         <div className="bg-neutral-950/50 p-2 rounded-lg border border-neutral-800/50">
-                            <span className="text-[8px] text-neutral-600 block mb-1 uppercase font-bold">JTBD (Target Task)</span>
+                            <span className="text-[8px] text-neutral-600 block mb-1 uppercase font-bold">JTBD (Задача клиента)</span>
                             <span className="text-[9px] text-neutral-400 block leading-tight truncate" title={String(result.thinking_models.jobs_to_be_done)}>
                                 {typeof result.thinking_models.jobs_to_be_done === 'object' ? '...' : (result.thinking_models.jobs_to_be_done || result.thinking_models.analogy_bridge)}
                             </span>
@@ -260,7 +260,7 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
             <div className="mt-6 pt-4 border-t border-neutral-800 flex justify-between items-end relative z-10">
                 <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-neutral-500 uppercase font-bold">Synergy Score</span>
+                        <span className="text-[10px] text-neutral-500 uppercase font-bold">Оценка синергии</span>
                         <span className="text-lg font-black text-purple-400">
                             {result.scores?.total || result.synergy_score}/10
                         </span>
@@ -268,11 +268,11 @@ function BlenderCard({ result, index }: { result: SynergyResult, index: number }
                     {result.scores && (
                         <div className="flex gap-3">
                             <div className="flex flex-col">
-                                <span className="text-[8px] text-neutral-600 uppercase font-bold">Blue Ocean</span>
+                                <span className="text-[8px] text-neutral-600 uppercase font-bold">Голубой океан</span>
                                 <span className="text-[11px] font-bold text-blue-400">{result.scores.blue_ocean}/10</span>
                             </div>
                             <div className="flex flex-col">
-                                <span className="text-[8px] text-neutral-600 uppercase font-bold">Knowledge</span>
+                                <span className="text-[8px] text-neutral-600 uppercase font-bold">Перенос знаний</span>
                                 <span className="text-[11px] font-bold text-amber-400">{result.scores.knowledge_transfer}/10</span>
                             </div>
                         </div>

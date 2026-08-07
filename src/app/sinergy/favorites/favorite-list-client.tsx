@@ -78,7 +78,7 @@ export function FavoriteListClient({ initialIdeas }: { initialIdeas: Idea[] | nu
                 >
                     <div className="flex justify-between items-start mb-4">
                         <span className="text-[10px] uppercase font-black tracking-widest text-neutral-500 bg-neutral-900/80 px-2 py-1 rounded-md border border-neutral-800">
-                            {idea.vertical || 'IDEA'}
+                            {idea.vertical || 'ИДЕЯ'}
                         </span>
 
                         <div className="flex gap-2 ml-auto z-10">

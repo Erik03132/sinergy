@@ -8,6 +8,7 @@ import { getGitHubTrendingAll } from "./github-trending";
 import { getIndieHackersPosts } from "./indiehackers";
 import { getTechCrunchStartupPosts } from "./techcrunch";
 import { translateBatch } from '@/lib/ai/translate'
+import { askGemini } from '@/lib/ai/gemini'
 
 export interface DiscoveryResult {
     count: number
@@ -158,22 +159,61 @@ export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
     }
     err(`collected ${collected.length} new items total`)
 
-    // 2. Translate everything in one batch
+    // 2. Translate everything to Russian — Gemini primary
     let toSave: PendingItem[] = collected
     if (collected.length > 0) {
+      let translated: (PendingItem & { summary?: string })[] | null = null
+
+      // First try OmniRoute batch
       try {
-        const translated = await translateBatch(
+        const res = await translateBatch(
           collected.map((i) => ({ title: i.title, description: i.description || i.title }))
         )
-        toSave = collected.map((item, idx) => ({
+        translated = collected.map((item, idx) => ({
           ...item,
-          title: translated[idx]?.title || item.title,
-          description: translated[idx]?.description || item.description,
-          summary: translated[idx]?.summary || undefined,
+          title: res[idx]?.title || item.title,
+          description: res[idx]?.description || item.description,
+          summary: res[idx]?.summary,
         }))
-        err(`translated ${translated.length} items`)
+        err(`translated ${collected.length} items via OmniRoute`)
       } catch (e: any) {
-        err(`translate all failed, saving originals: ${e?.message || e}`)
+        err(`OmniRoute batch translation failed: ${e?.message || e}`)
+      }
+
+      // Verify: if many items still fully English, force Gemini per-item retry
+      const englishCount = (translated ?? []).filter(it =>
+        /[A-Za-z]/.test(it.title) && !/[А-Яа-яЁё]/.test(it.title)
+      ).length
+      if (!translated || englishCount > 0) {
+        const needs = translated
+          ? collected.filter((_, i) => {
+              const t = translated![i]
+              return /[A-Za-z]/.test(t.title) && !/[А-Яа-яЁё]/.test(t.title)
+            })
+          : collected
+        err(`${needs.length} items need Gemini translation`)
+
+        const geminiRes = await translateSingleGeminiBatch(
+          needs.map((i) => ({ title: i.title, description: i.description || i.title }))
+        )
+        if (geminiRes) {
+          translated = collected.map((item, idx) => {
+            const gemini = geminiRes[item.title]
+            if (gemini && translated && /[A-Za-z]/.test(translated[idx].title) && !/[А-Яа-яЁё]/.test(translated[idx].title)) {
+              return { ...item, title: gemini.title, description: gemini.description }
+            }
+            return translated ? translated[idx] : item
+          })
+        }
+      }
+
+      if (translated) {
+        toSave = translated.map((item, idx) => ({
+          ...item,
+          title: translated![idx]?.title || item.title,
+          description: translated![idx]?.description || item.description,
+          summary: translated![idx]?.summary,
+        }))
       }
     }
 
@@ -185,7 +225,7 @@ export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
                 source: 'user',
                 title: item.title.slice(0, 500),
                 description: (item.description || item.title).slice(0, 2000),
-                vertical: 'News',
+                vertical: 'Новости',
                 core_tech: [],
                 target_audience: 'TBD',
                 business_model: 'TBD',
@@ -224,26 +264,72 @@ export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
     return { count: total, errors: [...errors] }
 }
 
+async function translateSingleGemini(title: string, description: string): Promise<{ title: string; description: string } | null> {
+  try {
+    const prompt = `Переведи заголовок и описание стартапа на русский язык. Сохрани термины и названия продуктов.
+Верни ТОЛЬКО JSON: {"title_ru":"...","description_ru":"..."}
+
+title: ${title}
+description: ${description || title}`
+    const raw = await askGemini(prompt)
+    const json = raw.match(/\{[\s\S]*\}/)
+    if (json) {
+      const parsed = JSON.parse(json[0])
+      return { title: parsed.title_ru || title, description: parsed.description_ru || description }
+    }
+  } catch (e: any) {
+    err(`gemini single translate failed: ${e?.message || e}`)
+  }
+  return null
+}
+
+async function translateSingleGeminiBatch(
+  items: { title: string; description: string }[]
+): Promise<Record<string, { title: string; description: string }> | null> {
+  if (items.length === 0) return {}
+  try {
+    const prompt = `Переведи следующие ${items.length} заголовков и описаний стартапов с английского на русский.
+Сохрани термины и названия продуктов.
+Верни ТОЛЬКО JSON-объект: {"original_title": {"title_ru":"...","description_ru":"..."}}
+
+${items.map((item, i) => `[${i}] title: ${item.title}\ndescription: ${item.description || item.title}`).join('\n\n')}`
+    const raw = await askGemini(prompt)
+    const json = raw.match(/\{[\s\S]*\}/)
+    if (!json) return null
+    const parsed = JSON.parse(json[0])
+    const result: Record<string, { title: string; description: string }> = {}
+    for (const item of items) {
+      if (parsed[item.title]) {
+        result[item.title] = {
+          title: parsed[item.title].title_ru || item.title,
+          description: parsed[item.title].description_ru || item.description,
+        }
+      }
+    }
+    return result
+  } catch (e: any) {
+    err(`gemini batch translate failed: ${e?.message || e}`)
+    return null
+  }
+}
+
 export async function retranslateExisting(): Promise<{ updated: number; errors: string[] }> {
   errors.length = 0
   const supabase = await createClient()
 
-  const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
   const { data: recent, error: selectErr } = await supabase
     .from('ideas')
     .select('id, title, description, metadata')
-    .eq('source', 'user')
-    .gte('created_at', since)
+    .in('source', ['user', 'automatic'])
     .order('created_at', { ascending: false })
-    .limit(100)
+    .limit(200)
 
   if (selectErr) {
     err(`retranslate select error: ${selectErr.message}`)
     return { updated: 0, errors: [...errors] }
   }
   if (!recent || recent.length === 0) {
-    err('retranslate: no recent items to translate')
+    err('retranslate: no items to translate')
     return { updated: 0, errors: [...errors] }
   }
 
@@ -255,10 +341,30 @@ export async function retranslateExisting(): Promise<{ updated: number; errors: 
     )
 
     let updated = 0
+
+    const unchanged = recent
+      .map((item, i) => ({ item, translated: translated[i], idx: i }))
+      .filter(({ item, translated: t }) => !t || t.title === item.title)
+
+    if (unchanged.length > 0) {
+      err(`${unchanged.length} items need Gemini retry`)
+      const geminiRes = await translateSingleGeminiBatch(
+        unchanged.map(({ item }) => ({ title: item.title, description: item.description || item.title }))
+      )
+      if (geminiRes) {
+        for (const { item, idx } of unchanged) {
+          if (geminiRes[item.title] && geminiRes[item.title].title !== item.title) {
+            translated[idx] = geminiRes[item.title] as any
+          }
+        }
+      }
+    }
+
     for (let i = 0; i < recent.length; i++) {
       const item = recent[i]
       const t = translated[i]
-      if (!t) continue
+
+      if (!t || t.title === item.title) continue
 
       const meta = item.metadata || {}
       const { error: updateErr } = await supabase
@@ -280,7 +386,36 @@ export async function retranslateExisting(): Promise<{ updated: number; errors: 
     err(`retranslate: updated ${updated}/${recent.length}`)
     return { updated, errors: [...errors] }
   } catch (e: any) {
-    err(`retranslate failed: ${e?.message || e}`)
-    return { updated: 0, errors: [...errors] }
+    err(`retranslate batch failed, trying Gemini batch: ${e?.message || e}`)
+
+    let updated = 0
+    const geminiRes = await translateSingleGeminiBatch(
+      recent.map((r: any) => ({ title: r.title, description: r.description || r.title }))
+    )
+    if (geminiRes) {
+      for (const item of recent) {
+        const result = geminiRes[item.title]
+        if (!result || result.title === item.title) continue
+
+        const meta = item.metadata || {}
+        const { error: updateErr } = await supabase
+          .from('ideas')
+          .update({
+            title: result.title.slice(0, 500),
+            description: (result.description || result.title).slice(0, 2000),
+            metadata: { ...meta, retranslated: true }
+          })
+          .eq('id', item.id)
+
+        if (updateErr) {
+          err(`retranslate per-item err for ${item.id}: ${updateErr.message}`)
+        } else {
+          updated++
+        }
+      }
+    }
+
+    err(`retranslate Gemini: updated ${updated}/${recent.length}`)
+    return { updated, errors: [...errors] }
   }
 }
