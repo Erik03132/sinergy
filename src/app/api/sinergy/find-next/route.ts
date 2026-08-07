@@ -15,7 +15,7 @@ export async function POST(req: Request) {
         const { data: ideas, error } = await supabase
             .from('ideas')
             .select('*')
-            .neq('vertical', 'Новости')
+            .not('vertical', 'is', null)
             .order('created_at', { ascending: false })
             .limit(500)
 
@@ -23,7 +23,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ status: 'error', error: error.message } as any, { status: 500 })
         }
         if (!ideas || ideas.length < 2) {
-            return NextResponse.json({ status: 'no_more_synergy', reason: 'need_at_least_2_ideas' } as any)
+            return NextResponse.json({ status: 'no_more_synergy' } as any)
         }
 
         const results = await runBlender(ideas, { mode })
