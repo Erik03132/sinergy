@@ -18,6 +18,7 @@ const classifySchema = z.object({
     core_tech: z.array(z.string()).optional(),
     target_audience: z.string().optional(),
     business_model: z.string().optional(),
+    interview_answers: z.record(z.string()).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -41,11 +42,17 @@ export async function POST(req: NextRequest) {
                 tags: ['synergy'],
             }
         } else {
+            const interviewBlock = parsed.interview_answers && Object.keys(parsed.interview_answers).length > 0
+                ? `\nClarifying answers from the founder:\n${Object.entries(parsed.interview_answers)
+                    .map(([q, a]) => `- ${q}: ${a}`).join('\n')}\nUse them to refine vertical/audience/business_model.`
+                : ''
+
             // Updated prompt for Russian handling
             const prompt = `
                 You are a startup idea classifier. Analyze the following idea:
                 Title: "${title}"
                 Description: "${description}"
+                ${interviewBlock}
 
                 Provide a JSON response with the following fields:
                 - vertical: One of ['HealthTech', 'EdTech', 'FinTech', 'ProductivityTools', 'AI-infrastructure', 'CleanTech', 'Logistics', 'Entertainment', 'Other']

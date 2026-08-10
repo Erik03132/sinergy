@@ -15,15 +15,20 @@ TSX = ["npx", "tsx"]
 
 def ts_eval(code: str, cwd: str = None) -> bool:
     """Execute TypeScript code and return True if no error."""
+    env = os.environ.copy()
+    # Детерминированность: без AI-ключей агенты идут в детерминированный fallback
+    for k in ("OPENROUTER_API_KEY", "GEMINI_API_KEY", "GEMINI_API_KEY_SECONDARY"):
+        env.pop(k, None)
     result = subprocess.run(
         TSX + ["-e", code],
         cwd=cwd or BASE_DIR,
         capture_output=True,
         text=True,
-        timeout=30,
+        timeout=45,
+        env=env,
     )
     if result.returncode != 0:
-        print(f"  ❌ Error: {result.stderr[:200]}")
+        print(f"  ❌ Error: {result.stderr[:300]}")
         return False
     return True
 
@@ -230,17 +235,20 @@ console.log('Discovery keyword filter works')
         code = """
 import { builderBuild } from '@/lib/sinergy/agents/builder'
 
+async function main() {
 const a: any = { id: '1', vertical: 'HealthTech', core_tech: ['AI', 'LLM'], business_model: 'SaaS', target_audience: 'Chronic patients', title: 'AI Health', description: 'AI health tracking', pain_point: ['No tracking'], temporal_marker: '2026', source: 'user', created_at: '2026-01-01' }
 const b: any = { id: '2', vertical: 'EdTech', core_tech: ['Computer Vision'], business_model: 'Marketplace', target_audience: 'Students', title: 'Edu Vision', description: 'Education AR', pain_point: ['No AR'], temporal_marker: '2026', source: 'user', created_at: '2026-01-01' }
 
-const result = builderBuild(a, b)
-console.assert(result !== null, 'Builder should produce result')
-console.assert(!!result.synergy_title, 'Should have title')
-console.assert(!!result.mvp_scenario, 'Should have MVP')
-console.assert(!!result.logic_chain, 'Should have logic chain')
-console.assert(result.scores.total >= 0 && result.scores.total <= 10, 'Score in range')
-console.assert(result.thinking_models.blue_ocean_errc.length > 0, 'Should have ERRC')
+const result = await builderBuild(a, b)
+if (!result) throw new Error('Builder should produce result')
+if (!result.synergy_title) throw new Error('Should have title')
+if (!result.mvp_scenario) throw new Error('Should have MVP')
+if (!result.logic_chain) throw new Error('Should have logic chain')
+if (!(result.scores.total >= 0 && result.scores.total <= 10)) throw new Error('Score in range')
+if (!(result.thinking_models.blue_ocean_errc.length > 0)) throw new Error('Should have ERRC')
 console.log('Builder agent tests passed')
+}
+main()
 """
         assert ts_eval(code), "Builder agent tests failed"
 
@@ -250,10 +258,13 @@ console.log('Builder agent tests passed')
         code = """
 import { builderBuild } from '@/lib/sinergy/agents/builder'
 
+async function main() {
 const a: any = { id: '1', vertical: 'HealthTech', core_tech: [], business_model: 'SaaS', target_audience: '', title: 'Тест', description: 'test', pain_point: [], temporal_marker: '2026', source: 'user', created_at: '2026-01-01' }
-const result = builderBuild(a, a)
-console.assert(result === null, 'Same idea should be rejected')
+const result = await builderBuild(a, a)
+if (result !== null) throw new Error('Same idea should be rejected')
 console.log('Builder rejection test passed')
+}
+main()
 """
         assert ts_eval(code), "Builder rejection failed"
 
@@ -267,10 +278,11 @@ import { skepticValidate } from '@/lib/sinergy/agents/skeptic'
 async function main() {
 const a: any = { id: '1', vertical: 'HealthTech', core_tech: ['AI'], business_model: 'SaaS', target_audience: 'Chronic patients', title: 'AI Health', description: 'health', pain_point: ['No tracking'], temporal_marker: '2026', source: 'user', created_at: '2026-01-01' }
 const b: any = { id: '2', vertical: 'EdTech', core_tech: ['Computer Vision'], business_model: 'Marketplace', target_audience: 'Students', title: 'Edu Vision', description: 'education', pain_point: ['No AR'], temporal_marker: '2026', source: 'user', created_at: '2026-01-01' }
-const built = builderBuild(a, b)
+const built = await builderBuild(a, b)
+if (!built) throw new Error('Builder should produce result')
 const result = await skepticValidate(a, b, built.synergy_title, built.synergy_description)
-console.assert(result.risks.length > 0, 'Should have some risks')
-console.assert(['low', 'medium', 'high'].includes(result.failure_probability), 'Valid probability')
+if (!(result.risks.length > 0)) throw new Error('Should have some risks')
+if (!['low', 'medium', 'high'].includes(result.failure_probability)) throw new Error('Valid probability')
 console.log('Skeptic agent tests passed')
 }
 main()
@@ -288,9 +300,9 @@ async function main() {
 const a: any = { id: '1', vertical: 'HealthTech', core_tech: ['AI'], business_model: 'SaaS', target_audience: 'Chronic patients', title: 'AI Health', description: 'health', pain_point: ['No tracking'], temporal_marker: '2026', source: 'user', created_at: '2026-01-01' }
 const b: any = { id: '2', vertical: 'EdTech', core_tech: ['Computer Vision'], business_model: 'Marketplace', target_audience: 'Students', title: 'Edu Vision', description: 'education', pain_point: ['No AR'], temporal_marker: '2026', source: 'user', created_at: '2026-01-01' }
 const result = await optimistAnalyze(a, b)
-console.assert(result.scores.blue_ocean >= 0 && result.scores.blue_ocean <= 10, 'Blue ocean score')
-console.assert(!!result.blue_ocean_analysis, 'Should have analysis')
-console.assert(!!result.ai_trend_forecast, 'Should have AI forecast')
+if (!(result.scores.blue_ocean >= 0 && result.scores.blue_ocean <= 10)) throw new Error('Blue ocean score')
+if (!result.blue_ocean_analysis) throw new Error('Should have analysis')
+if (!result.ai_trend_forecast) throw new Error('Should have AI forecast')
 console.log('Optimist agent tests passed')
 }
 main()

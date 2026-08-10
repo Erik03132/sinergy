@@ -137,8 +137,7 @@ export async function builderBuild(a: Idea, b: Idea): Promise<BuilderResult | nu
     const tech = combineTech(a, b)
 
     try {
-        const apiKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY
-        if (!apiKey) return deterministicFallback(a, b, score)
+        // OmniRoute VPS — всегда доступен, ключи не нужны
 
         const prompt = FALLBACK_BUILDER_PROMPT
             .replace('{titleA}', a.title || '')

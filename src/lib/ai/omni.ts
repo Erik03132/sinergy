@@ -1,91 +1,75 @@
-import https from 'https'
-import { HttpsProxyAgent } from 'https-proxy-agent'
+/**
+ * OmniRoute клиент — VPS 217.149.23.113:20128.
+ * OpenAI-совместимый API, авто-роутинг OpenRouter/free/cheap.
+ * Без прокси (российский сервер — ADR-002).
+ */
 
-const PROXY_URL = process.env.HTTP_PROXY || 'http://Q3NeJXTY:dsBaWh2L@172.120.21.141:64468'
+const OMNIROUTE_URL = 'http://217.149.23.113:20128/v1/chat/completions'
 
-const OR_MODELS = [
-  'nvidia/nemotron-3-ultra-550b-a55b:free',
-  'openrouter/free',
-  'google/gemma-4-31b-it:free',
-  'google/gemma-4-26b-a4b-it:free',
-  'cohere/north-mini-code:free',
-  'openai/gpt-oss-20b:free',
+const FREE_MODELS = [
+  'deepseek/deepseek-chat',
+  'google/gemini-2.0-flash-001',
+  'openai/gpt-4o-mini',
 ]
 
-function request(url: string, body: object, signal: AbortSignal): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const u = new URL(url)
-    const agent = new HttpsProxyAgent(PROXY_URL)
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
-    const req = https.request({
-      hostname: u.hostname,
-      path: u.pathname,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      },
-      agent,
-      signal,
-    }, (res) => {
-      let data = ''
-      res.on('data', (chunk: string) => data += chunk)
-      res.on('end', () => {
-        if (!res.statusCode || res.statusCode >= 400) {
-          reject(new Error(`${res.statusCode}: ${data.slice(0, 200)}`))
-        } else {
-          try {
-            const parsed = JSON.parse(data)
-            const content = parsed?.choices?.[0]?.message?.content
-            if (content) resolve(content)
-            else reject(new Error('empty response'))
-          } catch (e) {
-            reject(new Error(`parse error: ${data.slice(0, 200)}`))
-          }
-        }
-      })
-    })
-
-    req.on('error', reject)
-    req.write(JSON.stringify(body))
-    req.end()
+async function tryModel(model: string, messages: { role: string; content: string }[], signal: AbortSignal): Promise<string> {
+  const response = await fetch(OMNIROUTE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages,
+      temperature: 0.3,
+      max_tokens: 2048,
+    }),
+    signal,
   })
+
+  if (!response.ok) {
+    const err = await response.text().catch(() => '')
+    throw new Error(`${response.status}: ${err.slice(0, 200)}`)
+  }
+
+  const data = await response.json()
+  const content = data?.choices?.[0]?.message?.content
+  if (content) return content
+
+  throw new Error('empty response')
 }
 
 export async function askOmni(prompt: string, system?: string): Promise<string> {
   const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 90000)
+  const timer = setTimeout(() => controller.abort(), 120000)
 
   const messages = [
     ...(system ? [{ role: 'system' as const, content: system }] : []),
     { role: 'user', content: prompt },
   ]
 
-  const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
-
   try {
-    if (!process.env.OPENROUTER_API_KEY) throw new Error('OPENROUTER_API_KEY not set')
-
-    // 3 pass с задержкой между попытками (rate-limit на free моделях)
-    for (let pass = 0; pass < 3; pass++) {
-      for (const model of OR_MODELS) {
-        try {
-          return await request('https://openrouter.ai/api/v1/chat/completions', {
-            model,
-            messages,
-            temperature: 0.3,
-          }, controller.signal)
-        } catch (e: any) {
-          const isRateLimit = /429|rate|limit/i.test(e.message)
-          console.warn(`OR ${model} failed: ${e.message}${isRateLimit ? ' (rate-limited)' : ''}`)
-          if (isRateLimit) await sleep(1500)
-        }
-      }
-      console.warn(`Pass ${pass + 1} exhausted, retrying...`)
-      await sleep(2000)
+    if (!process.env.OMNIROUTE_URL && !process.env.OPENROUTER_API_KEY) {
+      throw new Error('OmniRoute URL and OpenRouter key not set')
     }
 
-    throw new Error('All OpenRouter models failed')
+    for (let pass = 0; pass < 3; pass++) {
+      for (const model of FREE_MODELS) {
+        try {
+          console.log(`🔄 OmniRoute (${model})...`)
+          const result = await tryModel(model, messages, controller.signal)
+          return result
+        } catch (e: any) {
+          const isRateLimit = /429|rate|limit/i.test(e.message)
+          console.warn(`⚠️ OmniRoute ${model}: ${e.message}${isRateLimit ? ' (rate-limited)' : ''}`)
+          if (isRateLimit) await sleep(2000)
+        }
+      }
+      console.warn(`OmniRoute pass ${pass + 1} exhausted, retrying...`)
+      await sleep(3000)
+    }
+
+    throw new Error('All OmniRoute models exhausted')
   } finally {
     clearTimeout(timer)
   }

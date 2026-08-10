@@ -19,7 +19,7 @@ export default function BlenderPage() {
                 fetch('/api/sinergy/find-next', { method: 'POST' }).then(r => r.json())
             )
             const data = await Promise.all(promises)
-            const valid = data.filter(d => d.synergy_status === 'synergy_found' && d.components)
+            const valid = data.filter(d => d.status === 'synergy_found' && d.components)
             setResults(valid)
 
             if (valid.length === 0) {

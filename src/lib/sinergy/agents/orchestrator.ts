@@ -132,7 +132,7 @@ export interface OrchestratorOptions {
 }
 
 export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {}): Promise<SynergyResult[]> {
-    const mode: AgentMode = options.mode || (process.env.GEMINI_API_KEY ? 'full' : 'det-only')
+    const mode: AgentMode = options.mode || 'full'
     const pairs = selectPairs(ideas, options.pairCount || 80)
 
     if (pairs.length === 0) {

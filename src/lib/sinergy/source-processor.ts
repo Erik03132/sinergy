@@ -104,7 +104,7 @@ export async function registerSource(details: any, type: 'telegram' | 'web') {
         ВСЕ ТЕКСТЫ В JSON ДОЛЖНЫ БЫТЬ НА РУССКОМ ЯЗЫКЕ.
         
         ТЕКСТ ДЛЯ АНАЛИЗА:
-        """\${content.substring(0, 10000)}"""
+        """${content.substring(0, 10000)}"""
     `;
 
     let extractedIdeas: any[] = [];
@@ -114,7 +114,7 @@ export async function registerSource(details: any, type: 'telegram' | 'web') {
 
         // Очистка от markdown блоков и лишнего текста
         const clean = raw.replace(/```json/g, '').replace(/```/g, '').trim();
-        const jsonMatch = clean.match(/\\[[\\s\\S]*\\]/);
+        const jsonMatch = clean.match(/\[[\s\S]*\]/);
         extractedIdeas = JSON.parse(jsonMatch ? jsonMatch[0] : (clean || "[]"));
 
         // 3. Фильтрация "score" (Семантический ранжировщик) и финальный санитарный чек

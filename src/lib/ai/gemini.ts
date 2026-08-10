@@ -1,18 +1,18 @@
 /**
  * AI клиент с каскадным fallback.
- * Primary: OpenRouter (DeepSeek V3, дешёвый)  →  Fallback: Gemini (если ключ есть)
+ * Primary: OmniRoute VPS (бесплатные модели, авто-роутинг)
+ * Fallback: Gemini 2.0 Flash → Flash Lite (требует GEMINI_API_KEY)
  */
 
-import { askOpenRouter } from './openrouter'
+import { askOmni } from './omni'
 
 interface GeminiResponse {
     candidates: Array<{ content: { parts: Array<{ text: string }> } }>
 }
 
-const MODELS = [
-    'openrouter',             // Primary: OpenRouter (DeepSeek V3, $0)
-    'gemini-2.0-flash',       // Fallback 1: Gemini (если ключ есть)
-    'gemini-2.0-flash-lite',  // Fallback 2: Lightweight
+const GEMINI_MODELS = [
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite',
 ]
 
 async function fetchGemini(model: string, apiKey: string, prompt: string, search: boolean = false) {
@@ -25,7 +25,7 @@ async function fetchGemini(model: string, apiKey: string, prompt: string, search
     }
 
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 25000) // 25s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 25000)
 
     try {
         const response = await fetch(
@@ -43,29 +43,26 @@ async function fetchGemini(model: string, apiKey: string, prompt: string, search
     }
 }
 
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
-
 export async function askGemini(prompt: string, options: { search?: boolean } = {}): Promise<string> {
-    const keys = [
-        process.env.GEMINI_API_KEY,
-        process.env.GEMINI_API_KEY_SECONDARY
-    ].filter(Boolean) as string[]
-
     const { search = false } = options
     const errors: string[] = []
 
-    for (const model of MODELS) {
-        try {
-            // --- Gemini (Google) ---
-            if (model.startsWith('gemini')) {
-                if (keys.length === 0) {
-                    errors.push('[gemini] GEMINI_API_KEY не задан')
-                    continue
-                }
+    // Search-grounded запросы идут напрямую в Gemini (OmniRoute не поддерживает grounding)
+    if (search) {
+        const keys = [
+            process.env.GEMINI_API_KEY,
+            process.env.GEMINI_API_KEY_SECONDARY,
+        ].filter(Boolean) as string[]
 
-                for (const key of keys) {
-                    console.log(`🤖 Gemini (${model})${search ? ' + Search' : ''} [Key: ...${key.slice(-4)}]`)
-                    const response = await fetchGemini(model, key, prompt, search)
+        if (keys.length === 0) {
+            throw new Error('AI search недоступен: не задан GEMINI_API_KEY')
+        }
+
+        for (const model of GEMINI_MODELS) {
+            for (const key of keys) {
+                try {
+                    console.log(`🔍 Gemini ${model} + Search [Key: ...${key.slice(-4)}]`)
+                    const response = await fetchGemini(model, key, prompt, true)
 
                     if (response.ok) {
                         const data: GeminiResponse = await response.json()
@@ -74,41 +71,55 @@ export async function askGemini(prompt: string, options: { search?: boolean } = 
                     }
 
                     const errText = await response.text()
-                    console.warn(`⚠️ Gemini ${model} [${key.slice(-4)}] failed (${response.status}):`, errText)
-                    errors.push(`[gemini:${model}] HTTP ${response.status}`)
-                }
-                continue
-            }
-
-            // --- OpenRouter ---
-            if (model === 'openrouter') {
-                if (!process.env.OPENROUTER_API_KEY) {
-                    console.log('⏭ OpenRouter: ключ не задан, пропускаем')
-                    continue
-                }
-                try {
-                    console.log('🤖 OpenRouter...')
-                    return await askOpenRouter(prompt)
+                    console.warn(`⚠️ Gemini ${model} [${key.slice(-4)}] failed (${response.status}): ${errText.slice(0, 200)}`)
                 } catch (e: unknown) {
                     const msg = e instanceof Error ? e.message : String(e)
-                    console.warn('⚠️ OpenRouter failed:', msg)
-                    errors.push(`[openrouter] ${msg}`)
+                    errors.push(`[gemini:${model}] ${msg}`)
                 }
-                continue
             }
-
-        } catch (e: unknown) {
-            const msg = e instanceof Error ? e.message : String(e)
-            console.error(`❌ Провайдер (${model}) крашнулся:`, msg)
-            errors.push(`[${model}] ${msg}`)
-            await delay(100)
         }
+
+        throw new Error('AI search временно недоступен. Все Gemini-ключи не ответили.')
     }
 
-    // Формируем понятное сообщение об ошибке
-    const hasGeminiKey = keys.length > 0
-    if (!hasGeminiKey) {
-        throw new Error('AI недоступен: не задан GEMINI_API_KEY. Обратитесь к администратору.')
+    // Primary: OmniRoute (бесплатные модели через VPS)
+    try {
+        console.log('🔄 OmniRoute (primary)...')
+        return await askOmni(prompt)
+    } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
+        console.warn('⚠️ OmniRoute failed:', msg)
+        errors.push(`[omni] ${msg}`)
+    }
+
+    // Fallback: Gemini
+    const keys = [
+        process.env.GEMINI_API_KEY,
+        process.env.GEMINI_API_KEY_SECONDARY,
+    ].filter(Boolean) as string[]
+
+    if (keys.length > 0) {
+        for (const model of GEMINI_MODELS) {
+            for (const key of keys) {
+                try {
+                    console.log(`🤖 Gemini ${model} [Key: ...${key.slice(-4)}]`)
+                    const response = await fetchGemini(model, key, prompt, false)
+
+                    if (response.ok) {
+                        const data: GeminiResponse = await response.json()
+                        const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+                        if (text) return text
+                    }
+
+                    const errText = await response.text()
+                    console.warn(`⚠️ Gemini ${model} [${key.slice(-4)}] failed (${response.status}): ${errText.slice(0, 200)}`)
+                    errors.push(`[gemini:${model}] HTTP ${response.status}`)
+                } catch (e: unknown) {
+                    const msg = e instanceof Error ? e.message : String(e)
+                    errors.push(`[gemini:${model}] ${msg}`)
+                }
+            }
+        }
     }
 
     throw new Error('AI временно недоступен. Все провайдеры не ответили. Попробуйте позже.')

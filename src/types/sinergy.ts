@@ -104,3 +104,12 @@ export interface SynergyScoreBreakdown {
   business: number;
   temporal: number;
 }
+
+export interface InterviewQuestion {
+    id: string
+    prompt: string
+    rationale: string
+    field: 'audience' | 'geo' | 'monetization' | 'competitors' | 'traction' | 'other'
+}
+
+export type InterviewAnswers = Record<string, string>

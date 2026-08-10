@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     try {
         const supabase = await createClient()
         const body = await req.json().catch(() => ({}))
-        const mode: AgentMode = body.mode || (process.env.GEMINI_API_KEY ? 'full' : 'det-only')
+        const mode: AgentMode = body.mode || 'full'
 
         const { data: ideas, error } = await supabase
             .from('ideas')
