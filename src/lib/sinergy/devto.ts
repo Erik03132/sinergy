@@ -6,6 +6,7 @@ export interface DevToArticle {
   user: string
   positive_reactions: number
   comments: number
+  published_at: string
 }
 
 export async function getDevToStartupPosts(signal?: AbortSignal): Promise<DevToArticle[]> {
@@ -29,6 +30,7 @@ export async function getDevToStartupPosts(signal?: AbortSignal): Promise<DevToA
           user: a.user?.name || 'Unknown',
           positive_reactions: a.positive_reactions_count || 0,
           comments: a.comments_count || 0,
+          published_at: a.published_at || '',
         })
       }
     } catch { }

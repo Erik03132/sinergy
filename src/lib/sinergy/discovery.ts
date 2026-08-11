@@ -4,7 +4,6 @@ import { getHNShow } from "./hackernews";
 import { getProductHuntTrending } from "./producthunt";
 import { getDevToStartupPosts } from "./devto";
 import { getRedditStartupPosts } from "./reddit";
-import { getGitHubTrendingAll } from "./github-trending";
 import { getIndieHackersPosts } from "./indiehackers";
 import { getTechCrunchStartupPosts } from "./techcrunch";
 import { translateBatch } from '@/lib/ai/translate'
@@ -43,14 +42,30 @@ function shortHash(input: string, length: number = 8): string {
 interface SourceDefinition {
   name: string
   fetcher: (signal: AbortSignal) => Promise<any[]>
-  mapper: (item: any) => { title: string; description: string; url: string; source: string }
+  mapper: (item: any) => { title: string; description: string; url: string; source: string; score?: number; publishedAt?: number | string }
+}
+
+const FRESHNESS_DAYS = 3
+
+function isFresh(publishedAt?: number | string): boolean {
+  if (!publishedAt) return true
+  const ts = typeof publishedAt === 'string' ? Date.parse(publishedAt) : publishedAt * 1000
+  if (isNaN(ts)) return true
+  const cutoff = Date.now() - FRESHNESS_DAYS * 24 * 60 * 60 * 1000
+  return ts >= cutoff
+}
+
+const QUALITY_GATES: Record<string, { minScore?: number; minReactions?: number }> = {
+  HN: { minScore: 50 },
+  Reddit: { minScore: 15 },
+  DevTo: { minReactions: 5 },
 }
 
 const SOURCES: SourceDefinition[] = [
   {
     name: 'HN',
     fetcher: (s) => getHNShow(15, s),
-    mapper: (i) => ({ title: i.title, description: i.text || i.title, url: i.url || `https://news.ycombinator.com/item?id=${i.id}`, source: 'HN' }),
+    mapper: (i) => ({ title: i.title, description: i.text || i.title, url: i.url || `https://news.ycombinator.com/item?id=${i.id}`, source: 'HN', score: i.score, publishedAt: i.time }),
   },
   {
     name: 'PH',
@@ -60,17 +75,12 @@ const SOURCES: SourceDefinition[] = [
   {
     name: 'DevTo',
     fetcher: (s) => getDevToStartupPosts(s),
-    mapper: (i) => ({ title: i.title, description: i.description, url: i.url, source: 'DevTo' }),
+    mapper: (i) => ({ title: i.title, description: i.description, url: i.url, source: 'DevTo', score: i.positive_reactions, publishedAt: i.published_at }),
   },
   {
     name: 'Reddit',
     fetcher: async (s) => getRedditStartupPosts(5, s),
-    mapper: (i) => ({ title: i.title, description: i.selftext?.slice(0, 500), url: i.url, source: `r/${i.subreddit}` }),
-  },
-  {
-    name: 'GH',
-    fetcher: async (s) => getGitHubTrendingAll(s),
-    mapper: (i) => ({ title: i.title, description: i.description?.slice(0, 500), url: i.url, source: 'GitHub' }),
+    mapper: (i) => ({ title: i.title, description: i.selftext?.slice(0, 500), url: i.url, source: `r/${i.subreddit}`, score: i.score, publishedAt: i.created_utc }),
   },
   {
     name: 'IH',
@@ -96,7 +106,7 @@ async function collectSource(
     supabase: any,
     sourceName: string,
     fetcher: (signal: AbortSignal) => Promise<any[]>,
-    mapper: (item: any) => { title: string; description: string; url: string; source: string }
+    mapper: (item: any) => { title: string; description: string; url: string; source: string; score?: number; publishedAt?: number | string }
 ): Promise<PendingItem[]> {
     try {
         err(`[${sourceName}] fetch start`)
@@ -108,14 +118,23 @@ async function collectSource(
             return []
         }
 
-        const items = raw.map(mapper).filter((i: any) => i.title && i.url)
-        err(`[${sourceName}] mapped: ${items.length} items`)
+        const gate = QUALITY_GATES[sourceName]
+        const items = raw.map(mapper).filter((i: any) => {
+            if (!i.title || !i.url) return false
+            const fresh = isFresh(i.publishedAt)
+            const meetsQuality = gate
+                ? (i.score ?? 0) >= (gate.minScore ?? gate.minReactions ?? 0)
+                : true
+            if (!fresh && !meetsQuality) return false
+            return true
+        });
+        err(`[${sourceName}] mapped: ${items.length} items (quality+freshness)`)
         if (items.length === 0) return []
 
         const { data: recent, error: selectErr } = await supabase.from('ideas')
             .select('title, metadata')
             .order('created_at', { ascending: false })
-            .limit(200);
+            .limit(500);
         if (selectErr) {
             err(`[${sourceName}] DB select error: ${selectErr.message}`)
             return []
