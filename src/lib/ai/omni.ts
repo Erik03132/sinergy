@@ -1,15 +1,18 @@
 /**
- * OmniRoute клиент — VPS 217.149.23.113:20128.
- * OpenAI-совместимый API, авто-роутинг OpenRouter/free/cheap.
- * Без прокси (российский сервер — ADR-002).
+ * OmniRoute клиент — локальный :20128 (провайдер OpenCode, тариф Go).
+ * Primary: oc/deepseek-v4-flash-free (бесплатная модель DeepSeek Flash).
+ * Fallback: прямой OpenRouter с бесплатными моделями (ключ из env).
+ * Адрес OmniRoute берётся из OMNIROUTE_URL (по умолчанию — локальный).
  */
 
-const OMNIROUTE_URL = 'http://217.149.23.113:20128/v1/chat/completions'
+import { askOpenRouter } from './openrouter'
 
-const FREE_MODELS = [
-  'deepseek/deepseek-chat',
-  'google/gemini-2.0-flash-001',
-  'openai/gpt-4o-mini',
+const OMNIROUTE_URL =
+    process.env.OMNIROUTE_URL ||
+    'http://localhost:20128/v1/chat/completions'
+
+const OMNI_MODELS = [
+    'oc/deepseek-v4-flash-free',
 ]
 
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
@@ -22,7 +25,8 @@ async function tryModel(model: string, messages: { role: string; content: string
       model,
       messages,
       temperature: 0.3,
-      max_tokens: 2048,
+      max_tokens: 8192,
+      stream: false,
     }),
     signal,
   })
@@ -49,12 +53,9 @@ export async function askOmni(prompt: string, system?: string): Promise<string> 
   ]
 
   try {
-    if (!process.env.OMNIROUTE_URL && !process.env.OPENROUTER_API_KEY) {
-      throw new Error('OmniRoute URL and OpenRouter key not set')
-    }
-
+    // Primary: OmniRoute → провайдер OpenCode (DeepSeek Flash)
     for (let pass = 0; pass < 3; pass++) {
-      for (const model of FREE_MODELS) {
+      for (const model of OMNI_MODELS) {
         try {
           console.log(`🔄 OmniRoute (${model})...`)
           const result = await tryModel(model, messages, controller.signal)
@@ -69,7 +70,8 @@ export async function askOmni(prompt: string, system?: string): Promise<string> 
       await sleep(3000)
     }
 
-    throw new Error('All OmniRoute models exhausted')
+    console.warn('OmniRoute exhausted, falling back to OpenRouter free...')
+    return await askOpenRouter(prompt)
   } finally {
     clearTimeout(timer)
   }

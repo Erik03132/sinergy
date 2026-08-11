@@ -24,7 +24,7 @@ def ts_eval(code: str, cwd: str = None) -> bool:
         cwd=cwd or BASE_DIR,
         capture_output=True,
         text=True,
-        timeout=45,
+        timeout=180,
         env=env,
     )
     if result.returncode != 0:

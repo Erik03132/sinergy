@@ -12,14 +12,15 @@ interface OpenRouterResponse {
     }>;
 }
 
-// Актуальные бесплатные модели OpenRouter (апрель 2026)
+// Актуальные бесплатные модели OpenRouter (проверены 11.08.2026)
 const OR_MODELS = [
     'nvidia/nemotron-3-ultra-550b-a55b:free',       // 1M контекст, самая мощная бесплатная
-    'openrouter/free',                                // Автоматический роутер по всем бесплатным
-    'google/gemma-4-31b-it:free',                     // Google Gemma 4 31B
+    'nvidia/nemotron-3-super-120b-a12b:free',       // Nemotron Super 120B
+    'openai/gpt-oss-20b:free',                       // OpenAI OSS 20B
     'google/gemma-4-26b-a4b-it:free',                // Google Gemma 4 26B
     'cohere/north-mini-code:free',                   // Cohere North Mini
-    'openai/gpt-oss-20b:free',                       // OpenAI OSS
+    'inclusionai/ling-3.0-tiny:free',                // Ling 3.0 Tiny
+    'openrouter/free',                                // Автоматический роутер по всем бесплатным
 ]
 
 export async function askOpenRouter(prompt: string): Promise<string> {
