@@ -7,17 +7,17 @@
 
 import { askOpenRouter } from './openrouter'
 
-const OMNIROUTE_URL =
-    process.env.OMNIROUTE_URL ||
-    'http://localhost:20128/v1/chat/completions'
+const OMNIROUTE_URL = process.env.OMNIROUTE_URL || 'http://localhost:20128/v1/chat/completions'
 
-const OMNI_MODELS = [
-    'oc/deepseek-v4-flash-free',
-]
+const OMNI_MODELS = ['oc/deepseek-v4-flash-free']
 
-const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-async function tryModel(model: string, messages: { role: string; content: string }[], signal: AbortSignal): Promise<string> {
+async function tryModel(
+  model: string,
+  messages: { role: string; content: string }[],
+  signal: AbortSignal
+): Promise<string> {
   const response = await fetch(OMNIROUTE_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -44,35 +44,32 @@ async function tryModel(model: string, messages: { role: string; content: string
 }
 
 export async function askOmni(prompt: string, system?: string): Promise<string> {
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 120000)
-
   const messages = [
     ...(system ? [{ role: 'system' as const, content: system }] : []),
     { role: 'user', content: prompt },
   ]
 
-  try {
-    // Primary: OmniRoute → провайдер OpenCode (DeepSeek Flash)
-    for (let pass = 0; pass < 3; pass++) {
-      for (const model of OMNI_MODELS) {
-        try {
-          console.log(`🔄 OmniRoute (${model})...`)
-          const result = await tryModel(model, messages, controller.signal)
-          return result
-        } catch (e: any) {
-          const isRateLimit = /429|rate|limit/i.test(e.message)
-          console.warn(`⚠️ OmniRoute ${model}: ${e.message}${isRateLimit ? ' (rate-limited)' : ''}`)
-          if (isRateLimit) await sleep(2000)
-        }
+  // Primary: OmniRoute → провайдер OpenCode (DeepSeek Flash)
+  for (let pass = 0; pass < 3; pass++) {
+    for (const model of OMNI_MODELS) {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 120000)
+      try {
+        console.log(`🔄 OmniRoute (${model})...`)
+        const result = await tryModel(model, messages, controller.signal)
+        return result
+      } catch (e: any) {
+        const isRateLimit = /429|rate|limit/i.test(e.message)
+        console.warn(`⚠️ OmniRoute ${model}: ${e.message}${isRateLimit ? ' (rate-limited)' : ''}`)
+        if (isRateLimit) await sleep(2000)
+      } finally {
+        clearTimeout(timer)
       }
-      console.warn(`OmniRoute pass ${pass + 1} exhausted, retrying...`)
-      await sleep(3000)
     }
-
-    console.warn('OmniRoute exhausted, falling back to OpenRouter free...')
-    return await askOpenRouter(prompt)
-  } finally {
-    clearTimeout(timer)
+    console.warn(`OmniRoute pass ${pass + 1} exhausted, retrying...`)
+    await sleep(3000)
   }
+
+  console.warn('OmniRoute exhausted, falling back to OpenRouter free...')
+  return await askOpenRouter(prompt)
 }
