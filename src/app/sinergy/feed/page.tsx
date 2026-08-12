@@ -1,4 +1,3 @@
-
 'use client'
 
 import React, { useState } from 'react'
@@ -13,293 +12,298 @@ import { cn } from '@/lib/utils'
 // Let's use a Client Page for "News Feed" to handle dynamic "Force Refresh" easily.
 
 export default function NewsFeedPage() {
-    // Initial fetch provided by Server Component would be better for SEO, 
-    // but for an App dashboard, client fetch is acceptable for "Live" feel.
-    // Let's stick to Client Side fetching for simplicity of "Refetching" after button click.
+  // Initial fetch provided by Server Component would be better for SEO,
+  // but for an App dashboard, client fetch is acceptable for "Live" feel.
+  // Let's stick to Client Side fetching for simplicity of "Refetching" after button click.
 
-    const [news, setNews] = useState<any[]>([])
-    const [isLoading, setIsLoading] = useState(true)
-    const [isRefreshing, setIsRefreshing] = useState(false)
-    const [isTranslating, setIsTranslating] = useState(false)
-    const [lastUpdate, setLastUpdate] = useState<string | null>(null)
-    const supabase = createClient()
-    const router = useRouter()
+  const [news, setNews] = useState<any[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
+  const [isTranslating, setIsTranslating] = useState(false)
+  const [lastUpdate, setLastUpdate] = useState<string | null>(null)
+  const supabase = createClient()
+  const router = useRouter()
 
-    const handleDetailsClick = (ideaId: string) => {
-        router.push(`/sinergy/analysis/${ideaId}`)
+  const handleDetailsClick = (ideaId: string) => {
+    router.push(`/sinergy/analysis/${ideaId}`)
+  }
+
+  const fetchNews = async () => {
+    setIsLoading(true)
+
+    // Fetch news - AI-business first (prioritized), then rest, newest first
+    const { data, error } = await supabase
+      .from('ideas')
+      .select('*')
+      .in('vertical', ['News', 'News (AI)'])
+      .order('created_at', { ascending: false })
+      .limit(150)
+
+    if (error) console.error('Supabase fetch error:', error)
+    if (data) {
+      console.log(`Fetched ${data.length} news items`)
+      // Приоритет: ИИ-бизнес кейсы первыми, остальные новости после
+      const aiFirst = [...data].sort((a, b) => {
+        const va = a.vertical === 'News (AI)' ? 1 : 0
+        const vb = b.vertical === 'News (AI)' ? 1 : 0
+        if (va !== vb) return vb - va
+        return 0 // created_at уже отсортирован в запросе
+      })
+      setNews(aiFirst)
     }
 
-    const fetchNews = async () => {
-        setIsLoading(true)
+    // Fetch last successful cron run
+    const { data: logData } = await supabase
+      .from('cron_logs')
+      .select('created_at')
+      .eq('name', 'daily-feed')
+      .eq('status', 'success')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single()
 
-        // Fetch news - Limit increased to 100, newest first strictly
-        const { data, error } = await supabase
-            .from('ideas')
-            .select('*')
-            .eq('vertical', 'News')
-            .order('created_at', { ascending: false })
-            .limit(100)
+    if (logData) setLastUpdate(logData.created_at)
 
-        if (error) console.error('Supabase fetch error:', error)
-        if (data) {
-            console.log(`Fetched ${data.length} news items`);
-            setNews(data)
-        }
+    setIsLoading(false)
+  }
 
-        if (data) setNews(data)
+  React.useEffect(() => {
+    fetchNews()
+  }, [])
 
-        // Fetch last successful cron run
-        const { data: logData } = await supabase
-            .from('cron_logs')
-            .select('created_at')
-            .eq('name', 'daily-feed')
-            .eq('status', 'success')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-
-        if (logData) setLastUpdate(logData.created_at)
-
-        setIsLoading(false)
+  React.useEffect(() => {
+    if (news.length > 0) {
+      console.log('Feed data sample:', news[0])
+      console.log('Has original_url:', !!news[0].original_url, news[0].original_url)
     }
+  }, [news])
 
-    React.useEffect(() => {
-        fetchNews()
-    }, [])
+  const handleForceRefresh = async () => {
+    setIsRefreshing(true)
+    toast.info('Запуск поиска новых идей... Это займет около 10-15 секунд.')
+    try {
+      const res = await fetch('/api/sinergy/feed/refresh', { method: 'POST' })
+      if (!res.ok) throw new Error('Ошибка обновления')
 
-    React.useEffect(() => {
-        if (news.length > 0) {
-            console.log('Feed data sample:', news[0])
-            console.log('Has original_url:', !!news[0].original_url, news[0].original_url)
-        }
-    }, [news])
+      const data = await res.json()
+      toast.success(`Найдено ${data.count} новых идей!`)
+      await fetchNews()
 
-    const handleForceRefresh = async () => {
-        setIsRefreshing(true)
-        toast.info("Запуск поиска новых идей... Это займет около 10-15 секунд.")
-        try {
-            const res = await fetch('/api/sinergy/feed/refresh', { method: 'POST' })
-            if (!res.ok) throw new Error('Ошибка обновления')
-
-            const data = await res.json()
-            toast.success(`Найдено ${data.count} новых идей!`)
-            await fetchNews()
-
-            if (data.count > 0) {
-                setIsTranslating(true)
-                toast.info("Переводим на русский...")
-                try {
-                    const trRes = await fetch('/api/sinergy/feed/refresh?retranslate=true', { method: 'POST' })
-                    const trData = await trRes.json()
-                    toast.success(`Переведено ${trData.updated || 0} записей!`)
-                    await fetchNews()
-                } catch {
-                    toast.error("Перевод не удался. Нажмите кнопку «Перевести» для повторной попытки.")
-                } finally {
-                    setIsTranslating(false)
-                }
-            }
-        } catch (e) {
-            toast.error("Ошибка при обновлении ленты.")
-        } finally {
-            setIsRefreshing(false)
-        }
-    }
-
-    const handleRetranslate = async () => {
+      if (data.count > 0) {
         setIsTranslating(true)
-        toast.info("Переводим существующий контент на русский... Это займет до 30 секунд.")
+        toast.info('Переводим на русский...')
         try {
-            const res = await fetch('/api/sinergy/feed/refresh?retranslate=true', { method: 'POST' })
-            const data = await res.json()
-            toast.success(`Переведено ${data.updated || 0} записей!`)
-            await fetchNews()
-        } catch (e) {
-            toast.error("Ошибка при переводе.")
+          const trRes = await fetch('/api/sinergy/feed/refresh?retranslate=true', { method: 'POST' })
+          const trData = await trRes.json()
+          toast.success(`Переведено ${trData.updated || 0} записей!`)
+          await fetchNews()
+        } catch {
+          toast.error('Перевод не удался. Нажмите кнопку «Перевести» для повторной попытки.')
         } finally {
-            setIsTranslating(false)
+          setIsTranslating(false)
         }
+      }
+    } catch (e) {
+      toast.error('Ошибка при обновлении ленты.')
+    } finally {
+      setIsRefreshing(false)
     }
+  }
 
-    const [archivingId, setArchivingId] = useState<string | null>(null)
-
-    const handleArchive = async (item: any) => {
-        if (archivingId) return
-        setArchivingId(item.id)
-
-        try {
-            const res = await fetch('/api/sinergy/ideas/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ idea: item })
-            })
-
-            if (!res.ok) {
-                const errorData = await res.json()
-                throw new Error(errorData.error || 'Не удалось сохранить')
-            }
-
-            const result = await res.json()
-            if (result.status === 'already_saved') {
-                toast.warning("Эта идея уже есть в Архиве")
-            } else {
-                toast.success("Новость сохранена в Архив!")
-            }
-        } catch (e: any) {
-            toast.error(`Ошибка: ${e.message}`)
-            console.error(e)
-        } finally {
-            setArchivingId(null)
-        }
+  const handleRetranslate = async () => {
+    setIsTranslating(true)
+    toast.info('Переводим существующий контент на русский... Это займет до 30 секунд.')
+    try {
+      const res = await fetch('/api/sinergy/feed/refresh?retranslate=true', { method: 'POST' })
+      const data = await res.json()
+      toast.success(`Переведено ${data.updated || 0} записей!`)
+      await fetchNews()
+    } catch (e) {
+      toast.error('Ошибка при переводе.')
+    } finally {
+      setIsTranslating(false)
     }
+  }
 
-    return (
-        <div className="p-4 md:p-8 max-w-5xl mx-auto w-full pb-24 lg:pb-8">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8 mt-2">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 shrink-0">
-                        <Newspaper className="w-6 h-6 text-emerald-500" />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Лента Стартапов</h1>
-                        <p className="text-xs md:text-sm text-neutral-500">Свежие идеи и кейсы до $100k</p>
-                        {lastUpdate && (
-                            <p className="text-[10px] text-emerald-500/70 mt-1">
-                                Последнее авто-обновление: {new Date(lastUpdate).toLocaleString('ru-RU')}
-                            </p>
-                        )}
-                    </div>
-                </div>
+  const [archivingId, setArchivingId] = useState<string | null>(null)
 
-                <button
-                    onClick={handleForceRefresh}
-                    disabled={isRefreshing}
-                    className="w-full sm:w-auto group relative px-6 py-2.5 bg-transparent border border-emerald-500/50 hover:border-emerald-500 text-emerald-400 hover:text-emerald-300 rounded-xl shadow-lg shadow-emerald-900/10 hover:shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-2 font-medium"
-                >
-                    <div className="absolute inset-0 bg-emerald-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
-                    {isRefreshing ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
-                    ) : (
-                        <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
-                    )}
-                    {isRefreshing ? 'Поиск...' : 'Обновить сейчас'}
-                </button>
+  const handleArchive = async (item: any) => {
+    if (archivingId) return
+    setArchivingId(item.id)
 
-                <button
-                    onClick={handleRetranslate}
-                    disabled={isTranslating || isRefreshing}
-                    className="w-full sm:w-auto group relative px-4 py-2.5 bg-transparent border border-amber-500/50 hover:border-amber-500 text-amber-400 hover:text-amber-300 rounded-xl shadow-lg shadow-amber-900/10 hover:shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-2 font-medium text-sm"
-                >
-                    <div className="absolute inset-0 bg-amber-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
-                    {isTranslating ? (
-                        <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
-                    ) : (
-                        <Languages className="w-4 h-4" />
-                    )}
-                    {isTranslating ? 'Перевод...' : 'Перевести'}
-                </button>
-            </div>
+    try {
+      const res = await fetch('/api/sinergy/ideas/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idea: item }),
+      })
 
-            {isLoading ? (
-                <div className="flex justify-center py-20">
-                    <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
-                </div>
-            ) : (
-                <div className="space-y-4">
-                    {news.map((item) => (
-                        <div key={item.id} className="bg-neutral-900/30 border border-neutral-800 p-4 md:p-6 rounded-2xl flex flex-col md:flex-row gap-4 md:gap-6 hover:bg-neutral-900/50 transition-colors group">
-                            <div className="flex-1 space-y-2">
-                                <div className="flex items-center gap-2 mb-1">
-                                    <span className="text-[10px] uppercase font-bold text-emerald-500 bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-900">
-                                        {item.metadata?.author || item.metadata?.original_source || item.source}
-                                    </span>
-                                    <span className="text-[10px] text-neutral-600 flex items-center gap-1.5">
-                                        {new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        {item.source === 'automatic' && (
-                                            <span className="flex items-center gap-1 text-[9px] text-amber-500/80 bg-amber-500/5 px-1.5 py-0.5 rounded-full border border-amber-500/20 animate-pulse">
-                                                🤖 Авто-сбор
-                                            </span>
-                                        )}
-                                    </span>
+      if (!res.ok) {
+        const errorData = await res.json()
+        throw new Error(errorData.error || 'Не удалось сохранить')
+      }
 
-                                </div>
+      const result = await res.json()
+      if (result.status === 'already_saved') {
+        toast.warning('Эта идея уже есть в Архиве')
+      } else {
+        toast.success('Новость сохранена в Архив!')
+      }
+    } catch (e: any) {
+      toast.error(`Ошибка: ${e.message}`)
+      console.error(e)
+    } finally {
+      setArchivingId(null)
+    }
+  }
 
-                                <h3 className="text-lg md:text-xl font-bold text-neutral-100 group-hover:text-emerald-400 transition-colors text-left leading-tight tracking-tight px-4">
-                                    {item.title}
-                                </h3>
-                                <p className="text-neutral-400 leading-relaxed text-sm md:text-base text-left opacity-80 px-4">
-                                    {item.description}
-                                </p>
-                                {item.metadata?.summary && (
-                                    <p className="text-neutral-500 leading-relaxed text-xs md:text-sm text-left px-4 mt-1 italic border-l-2 border-emerald-900/50 pl-3">
-                                        {item.metadata.summary}
-                                    </p>
-                                )}
-                            </div>
-
-                            <div className="flex flex-row md:flex-col gap-2 justify-end md:justify-center border-t md:border-t-0 md:border-l border-neutral-800 pt-4 md:pt-0 md:pl-6">
-                                {/* External Link Button - Always visible for debug */}
-                                {(() => {
-                                    const rawUrl = item.original_url || item.metadata?.url || item.metadata?.original_url;
-                                    const hasUrl = rawUrl && rawUrl !== 'N/A' && rawUrl !== '';
-                                    const finalUrl = hasUrl ? (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`) : null;
-
-                                    return hasUrl ? (
-                                        <a
-                                            href={finalUrl!}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="p-2.5 text-neutral-500 hover:text-yellow-400 bg-neutral-900/40 hover:bg-yellow-500/5 rounded-xl transition-all flex items-center justify-center border border-neutral-800/50 hover:border-yellow-500/30"
-                                            title="Читать источник"
-                                        >
-                                            <ExternalLink className="w-5 h-5" />
-                                        </a>
-                                    ) : (
-                                        <div
-                                            className="p-2.5 text-neutral-700 bg-neutral-900/50 border border-neutral-800 rounded-xl flex items-center justify-center opacity-30 cursor-not-allowed"
-                                            title="Источник не указан"
-                                        >
-                                            <ExternalLink className="w-5 h-5" />
-                                        </div>
-                                    )
-                                })()}
-
-                                <button
-                                    onClick={() => handleArchive(item)}
-                                    disabled={archivingId === item.id}
-                                    className="p-2.5 text-neutral-500 hover:text-emerald-500 bg-neutral-900/40 hover:bg-emerald-500/5 rounded-xl transition-all flex items-center justify-center border border-neutral-800/50 hover:border-emerald-500/30 disabled:opacity-50"
-                                    title="В Архив"
-                                >
-                                    {archivingId === item.id ? (
-                                        <Loader2 className="w-5 h-5 animate-spin" />
-                                    ) : (
-                                        <Library className="w-5 h-5" />
-                                    )}
-                                </button>
-                                <button
-                                    onClick={() => handleDetailsClick(item.id)}
-                                    className="p-2.5 text-neutral-500 hover:text-violet-400 bg-neutral-900/40 hover:bg-violet-500/5 rounded-xl transition-all flex items-center justify-center border border-neutral-800/50 hover:border-violet-500/30"
-                                    title="Подробный анализ"
-                                >
-                                    <FileText className="w-5 h-5" />
-                                </button>
-                            </div>
-                        </div>
-                    ))}
-
-                    {news.length === 0 && (
-                        <div className="py-20 text-center text-neutral-500 bg-neutral-900/20 rounded-2xl border border-neutral-800 border-dashed">
-                            <p className="mb-4">Лента пока пуста.</p>
-                            <button
-                                onClick={handleForceRefresh}
-                                className="text-emerald-500 hover:underline hover:text-emerald-400"
-                            >
-                                Запустить принудительный поиск
-                            </button>
-                        </div>
-                    )}
-                </div>
+  return (
+    <div className="p-4 md:p-8 max-w-5xl mx-auto w-full pb-24 lg:pb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-8 mt-2">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-neutral-900 rounded-xl border border-neutral-800 shrink-0">
+            <Newspaper className="w-6 h-6 text-emerald-500" />
+          </div>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Лента Стартапов</h1>
+            <p className="text-xs md:text-sm text-neutral-500">Свежие идеи и кейсы до $100k</p>
+            {lastUpdate && (
+              <p className="text-[10px] text-emerald-500/70 mt-1">
+                Последнее авто-обновление: {new Date(lastUpdate).toLocaleString('ru-RU')}
+              </p>
             )}
+          </div>
         </div>
-    )
+
+        <button
+          onClick={handleForceRefresh}
+          disabled={isRefreshing}
+          className="w-full sm:w-auto group relative px-6 py-2.5 bg-transparent border border-emerald-500/50 hover:border-emerald-500 text-emerald-400 hover:text-emerald-300 rounded-xl shadow-lg shadow-emerald-900/10 hover:shadow-emerald-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-2 font-medium"
+        >
+          <div className="absolute inset-0 bg-emerald-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
+          {isRefreshing ? (
+            <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
+          ) : (
+            <RefreshCw className="w-4 h-4 group-hover:rotate-180 transition-transform duration-500" />
+          )}
+          {isRefreshing ? 'Поиск...' : 'Обновить сейчас'}
+        </button>
+
+        <button
+          onClick={handleRetranslate}
+          disabled={isTranslating || isRefreshing}
+          className="w-full sm:w-auto group relative px-4 py-2.5 bg-transparent border border-amber-500/50 hover:border-amber-500 text-amber-400 hover:text-amber-300 rounded-xl shadow-lg shadow-amber-900/10 hover:shadow-amber-500/20 transition-all active:scale-95 disabled:opacity-70 disabled:cursor-not-allowed overflow-hidden flex items-center justify-center gap-2 font-medium text-sm"
+        >
+          <div className="absolute inset-0 bg-amber-500/10 translate-y-full group-hover:translate-y-0 transition-transform duration-300 pointer-events-none" />
+          {isTranslating ? (
+            <Loader2 className="w-4 h-4 animate-spin text-amber-400" />
+          ) : (
+            <Languages className="w-4 h-4" />
+          )}
+          {isTranslating ? 'Перевод...' : 'Перевести'}
+        </button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex justify-center py-20">
+          <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {news.map((item) => (
+            <div
+              key={item.id}
+              className="bg-neutral-900/30 border border-neutral-800 p-4 md:p-6 rounded-2xl flex flex-col md:flex-row gap-4 md:gap-6 hover:bg-neutral-900/50 transition-colors group"
+            >
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] uppercase font-bold text-emerald-500 bg-emerald-950/30 px-2 py-0.5 rounded border border-emerald-900">
+                    {item.metadata?.author || item.metadata?.original_source || item.source}
+                  </span>
+                  <span className="text-[10px] text-neutral-600 flex items-center gap-1.5">
+                    {new Date(item.created_at).toLocaleDateString()}{' '}
+                    {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    {item.source === 'automatic' && (
+                      <span className="flex items-center gap-1 text-[9px] text-amber-500/80 bg-amber-500/5 px-1.5 py-0.5 rounded-full border border-amber-500/20 animate-pulse">
+                        🤖 Авто-сбор
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                <h3 className="text-lg md:text-xl font-bold text-neutral-100 group-hover:text-emerald-400 transition-colors text-left leading-tight tracking-tight px-4">
+                  {item.title}
+                </h3>
+                <p className="text-neutral-400 leading-relaxed text-sm md:text-base text-left opacity-80 px-4">
+                  {item.description}
+                </p>
+                {item.metadata?.summary && (
+                  <p className="text-neutral-500 leading-relaxed text-xs md:text-sm text-left px-4 mt-1 italic border-l-2 border-emerald-900/50 pl-3">
+                    {item.metadata.summary}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-row md:flex-col gap-2 justify-end md:justify-center border-t md:border-t-0 md:border-l border-neutral-800 pt-4 md:pt-0 md:pl-6">
+                {/* External Link Button - Always visible for debug */}
+                {(() => {
+                  const rawUrl = item.original_url || item.metadata?.url || item.metadata?.original_url
+                  const hasUrl = rawUrl && rawUrl !== 'N/A' && rawUrl !== ''
+                  const finalUrl = hasUrl ? (rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`) : null
+
+                  return hasUrl ? (
+                    <a
+                      href={finalUrl!}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="p-2.5 text-neutral-500 hover:text-yellow-400 bg-neutral-900/40 hover:bg-yellow-500/5 rounded-xl transition-all flex items-center justify-center border border-neutral-800/50 hover:border-yellow-500/30"
+                      title="Читать источник"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                    </a>
+                  ) : (
+                    <div
+                      className="p-2.5 text-neutral-700 bg-neutral-900/50 border border-neutral-800 rounded-xl flex items-center justify-center opacity-30 cursor-not-allowed"
+                      title="Источник не указан"
+                    >
+                      <ExternalLink className="w-5 h-5" />
+                    </div>
+                  )
+                })()}
+
+                <button
+                  onClick={() => handleArchive(item)}
+                  disabled={archivingId === item.id}
+                  className="p-2.5 text-neutral-500 hover:text-emerald-500 bg-neutral-900/40 hover:bg-emerald-500/5 rounded-xl transition-all flex items-center justify-center border border-neutral-800/50 hover:border-emerald-500/30 disabled:opacity-50"
+                  title="В Архив"
+                >
+                  {archivingId === item.id ? (
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <Library className="w-5 h-5" />
+                  )}
+                </button>
+                <button
+                  onClick={() => handleDetailsClick(item.id)}
+                  className="p-2.5 text-neutral-500 hover:text-violet-400 bg-neutral-900/40 hover:bg-violet-500/5 rounded-xl transition-all flex items-center justify-center border border-neutral-800/50 hover:border-violet-500/30"
+                  title="Подробный анализ"
+                >
+                  <FileText className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {news.length === 0 && (
+            <div className="py-20 text-center text-neutral-500 bg-neutral-900/20 rounded-2xl border border-neutral-800 border-dashed">
+              <p className="mb-4">Лента пока пуста.</p>
+              <button onClick={handleForceRefresh} className="text-emerald-500 hover:underline hover:text-emerald-400">
+                Запустить принудительный поиск
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }

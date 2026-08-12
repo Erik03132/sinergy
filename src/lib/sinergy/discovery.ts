@@ -1,21 +1,25 @@
 import { createClient } from '@/lib/supabase/server'
-import { processManualUrl, extractAndSaveBatch } from "./source-processor";
-import { getHNShow } from "./hackernews";
-import { getProductHuntTrending } from "./producthunt";
-import { getDevToStartupPosts } from "./devto";
-import { getRedditStartupPosts } from "./reddit";
-import { getIndieHackersPosts } from "./indiehackers";
-import { getTechCrunchStartupPosts } from "./techcrunch";
+import { processManualUrl, extractAndSaveBatch } from './source-processor'
+import { getHNShow } from './hackernews'
+import { getProductHuntTrending } from './producthunt'
+import { getDevToStartupPosts } from './devto'
+import { getRedditStartupPosts } from './reddit'
+import { getIndieHackersPosts } from './indiehackers'
+import { getTechCrunchStartupPosts } from './techcrunch'
+import { getAllRSSFeeds } from './rss-sources'
 import { translateBatch } from '@/lib/ai/translate'
 import { askGemini } from '@/lib/ai/gemini'
 
 export interface DiscoveryResult {
-    count: number
-    errors: string[]
+  count: number
+  errors: string[]
 }
 
 const errors: string[] = []
-const err = (msg: string) => { errors.push(msg); console.error(msg) }
+const err = (msg: string) => {
+  errors.push(msg)
+  console.error(msg)
+}
 
 const FETCH_TIMEOUT = 5000
 
@@ -30,19 +34,26 @@ async function fetchWithTimeout<T>(fn: (signal: AbortSignal) => Promise<T>): Pro
 }
 
 function shortHash(input: string, length: number = 8): string {
-    let hash = 0;
-    for (let i = 0; i < input.length; i++) {
-        const char = input.charCodeAt(i);
-        hash = ((hash << 5) - hash) + char;
-        hash = hash & hash;
-    }
-    return Math.abs(hash).toString(36).substring(0, length);
+  let hash = 0
+  for (let i = 0; i < input.length; i++) {
+    const char = input.charCodeAt(i)
+    hash = (hash << 5) - hash + char
+    hash = hash & hash
+  }
+  return Math.abs(hash).toString(36).substring(0, length)
 }
 
 interface SourceDefinition {
   name: string
   fetcher: (signal: AbortSignal) => Promise<any[]>
-  mapper: (item: any) => { title: string; description: string; url: string; source: string; score?: number; publishedAt?: number | string }
+  mapper: (item: any) => {
+    title: string
+    description: string
+    url: string
+    source: string
+    score?: number
+    publishedAt?: number | string
+  }
 }
 
 const FRESHNESS_DAYS = 3
@@ -63,9 +74,21 @@ const QUALITY_GATES: Record<string, { minScore?: number; minReactions?: number }
 
 const SOURCES: SourceDefinition[] = [
   {
+    name: 'RSS',
+    fetcher: () => getAllRSSFeeds(),
+    mapper: (i) => ({ title: i.title, description: i.description || i.title, url: i.url, source: `RSS/${i.source}` }),
+  },
+  {
     name: 'HN',
     fetcher: (s) => getHNShow(15, s),
-    mapper: (i) => ({ title: i.title, description: i.text || i.title, url: i.url || `https://news.ycombinator.com/item?id=${i.id}`, source: 'HN', score: i.score, publishedAt: i.time }),
+    mapper: (i) => ({
+      title: i.title,
+      description: i.text || i.title,
+      url: i.url || `https://news.ycombinator.com/item?id=${i.id}`,
+      source: 'HN',
+      score: i.score,
+      publishedAt: i.time,
+    }),
   },
   {
     name: 'PH',
@@ -75,12 +98,26 @@ const SOURCES: SourceDefinition[] = [
   {
     name: 'DevTo',
     fetcher: (s) => getDevToStartupPosts(s),
-    mapper: (i) => ({ title: i.title, description: i.description, url: i.url, source: 'DevTo', score: i.positive_reactions, publishedAt: i.published_at }),
+    mapper: (i) => ({
+      title: i.title,
+      description: i.description,
+      url: i.url,
+      source: 'DevTo',
+      score: i.positive_reactions,
+      publishedAt: i.published_at,
+    }),
   },
   {
     name: 'Reddit',
     fetcher: async (s) => getRedditStartupPosts(5, s),
-    mapper: (i) => ({ title: i.title, description: i.selftext?.slice(0, 500), url: i.url, source: `r/${i.subreddit}`, score: i.score, publishedAt: i.created_utc }),
+    mapper: (i) => ({
+      title: i.title,
+      description: i.selftext?.slice(0, 500),
+      url: i.url,
+      source: `r/${i.subreddit}`,
+      score: i.score,
+      publishedAt: i.created_utc,
+    }),
   },
   {
     name: 'IH',
@@ -103,169 +140,179 @@ interface PendingItem {
 }
 
 async function collectSource(
-    supabase: any,
-    sourceName: string,
-    fetcher: (signal: AbortSignal) => Promise<any[]>,
-    mapper: (item: any) => { title: string; description: string; url: string; source: string; score?: number; publishedAt?: number | string }
+  supabase: any,
+  sourceName: string,
+  fetcher: (signal: AbortSignal) => Promise<any[]>,
+  mapper: (item: any) => {
+    title: string
+    description: string
+    url: string
+    source: string
+    score?: number
+    publishedAt?: number | string
+  }
 ): Promise<PendingItem[]> {
-    try {
-        err(`[${sourceName}] fetch start`)
-        const raw = await fetchWithTimeout(fetcher)
-        err(`[${sourceName}] fetch ok: ${raw?.length || 0} items`)
+  try {
+    err(`[${sourceName}] fetch start`)
+    const raw = await fetchWithTimeout(fetcher)
+    err(`[${sourceName}] fetch ok: ${raw?.length || 0} items`)
 
-        if (!raw || raw.length === 0) {
-            err(`[${sourceName}] empty response`)
-            return []
-        }
-
-        const gate = QUALITY_GATES[sourceName]
-        const items = raw.map(mapper).filter((i: any) => {
-            if (!i.title || !i.url) return false
-            const fresh = isFresh(i.publishedAt)
-            const meetsQuality = gate
-                ? (i.score ?? 0) >= (gate.minScore ?? gate.minReactions ?? 0)
-                : true
-            if (!fresh && !meetsQuality) return false
-            return true
-        });
-        err(`[${sourceName}] mapped: ${items.length} items (quality+freshness)`)
-        if (items.length === 0) return []
-
-        const { data: recent, error: selectErr } = await supabase.from('ideas')
-            .select('title, metadata')
-            .order('created_at', { ascending: false })
-            .limit(500);
-        if (selectErr) {
-            err(`[${sourceName}] DB select error: ${selectErr.message}`)
-            return []
-        }
-
-        const seenTitles = new Set(recent?.map((e: any) => e.title));
-        const seenUrls = new Set(
-            recent?.map((e: any) => e.metadata?.original_url).filter(Boolean)
-        );
-        const { isContentBanned } = await import("./source-processor");
-
-        const newItems = items.filter((item: any) => {
-            if (seenTitles.has(item.title)) return false
-            if (seenUrls.has(item.url)) return false
-            if (isContentBanned(`${item.title} ${item.description || ''}`.toLowerCase())) return false
-            return true
-        });
-        err(`[${sourceName}] after dedup: ${newItems.length}`)
-
-        return newItems.map((i: any) => ({ ...i, sourceName }))
-    } catch (e: any) {
-        err(`[${sourceName}] crash: ${e?.message || e}`)
-        return []
+    if (!raw || raw.length === 0) {
+      err(`[${sourceName}] empty response`)
+      return []
     }
+
+    const gate = QUALITY_GATES[sourceName]
+    const items = raw.map(mapper).filter((i: any) => {
+      if (!i.title || !i.url) return false
+      const fresh = isFresh(i.publishedAt)
+      const meetsQuality = gate ? (i.score ?? 0) >= (gate.minScore ?? gate.minReactions ?? 0) : true
+      if (!fresh && !meetsQuality) return false
+      return true
+    })
+    err(`[${sourceName}] mapped: ${items.length} items (quality+freshness)`)
+    if (items.length === 0) return []
+
+    const { data: recent, error: selectErr } = await supabase
+      .from('ideas')
+      .select('title, metadata')
+      .order('created_at', { ascending: false })
+      .limit(500)
+    if (selectErr) {
+      err(`[${sourceName}] DB select error: ${selectErr.message}`)
+      return []
+    }
+
+    const seenTitles = new Set(recent?.map((e: any) => e.title))
+    const seenUrls = new Set(recent?.map((e: any) => e.metadata?.original_url).filter(Boolean))
+    const { isContentBanned } = await import('./source-processor')
+
+    const newItems = items.filter((item: any) => {
+      if (seenTitles.has(item.title)) return false
+      if (seenUrls.has(item.url)) return false
+      if (isContentBanned(`${item.title} ${item.description || ''}`.toLowerCase())) return false
+      return true
+    })
+    err(`[${sourceName}] after dedup: ${newItems.length}`)
+
+    return newItems.map((i: any) => ({ ...i, sourceName }))
+  } catch (e: any) {
+    err(`[${sourceName}] crash: ${e?.message || e}`)
+    return []
+  }
 }
 
 export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
-    errors.length = 0
-    const supabase = await createClient()
+  errors.length = 0
+  const supabase = await createClient()
 
-    // 1. Collect all items from all sources in parallel
-    const collected: PendingItem[] = []
-    const sourceResults = await Promise.allSettled(
-      SOURCES.map(({ name, fetcher, mapper }) =>
-        collectSource(supabase, name, fetcher, mapper as any)
-      )
-    )
-    for (const r of sourceResults) {
-      if (r.status === 'fulfilled') collected.push(...r.value)
-      else err(`source crash: ${r.reason?.message || r.reason}`)
-    }
-    err(`collected ${collected.length} new items total`)
+  // 1. Collect all items from all sources in parallel
+  const collected: PendingItem[] = []
+  const sourceResults = await Promise.allSettled(
+    SOURCES.map(({ name, fetcher, mapper }) => collectSource(supabase, name, fetcher, mapper as any))
+  )
+  for (const r of sourceResults) {
+    if (r.status === 'fulfilled') collected.push(...r.value)
+    else err(`source crash: ${r.reason?.message || r.reason}`)
+  }
+  err(`collected ${collected.length} new items total`)
 
-    // 2. Translate everything to Russian — Gemini primary
-    let toSave: PendingItem[] = collected
-    if (collected.length > 0) {
-      let translated: (PendingItem & { summary?: string })[] | null = null
+  // 2. Translate everything to Russian — Gemini primary
+  let toSave: PendingItem[] = collected
+  if (collected.length > 0) {
+    let translated: (PendingItem & { summary?: string })[] | null = null
 
-      // First try OmniRoute batch
-      try {
-        const res = await translateBatch(
-          collected.map((i) => ({ title: i.title, description: i.description || i.title }))
-        )
-        translated = collected.map((item, idx) => ({
-          ...item,
-          title: res[idx]?.title || item.title,
-          description: res[idx]?.description || item.description,
-          summary: res[idx]?.summary,
-        }))
-        err(`translated ${collected.length} items via OmniRoute`)
-      } catch (e: any) {
-        err(`OmniRoute batch translation failed: ${e?.message || e}`)
-      }
-
-      // Verify: if many items still fully English, force Gemini per-item retry
-      const englishCount = (translated ?? []).filter(it =>
-        /[A-Za-z]/.test(it.title) && !/[А-Яа-яЁё]/.test(it.title)
-      ).length
-      if (!translated || englishCount > 0) {
-        const needs = translated
-          ? collected.filter((_, i) => {
-              const t = translated![i]
-              return /[A-Za-z]/.test(t.title) && !/[А-Яа-яЁё]/.test(t.title)
-            })
-          : collected
-        err(`${needs.length} items need Gemini translation`)
-
-        const geminiRes = await translateSingleGeminiBatch(
-          needs.map((i) => ({ title: i.title, description: i.description || i.title }))
-        )
-        if (geminiRes) {
-          translated = collected.map((item, idx) => {
-            const gemini = geminiRes[item.title]
-            if (gemini && translated && /[A-Za-z]/.test(translated[idx].title) && !/[А-Яа-яЁё]/.test(translated[idx].title)) {
-              return { ...item, title: gemini.title, description: gemini.description }
-            }
-            return translated ? translated[idx] : item
-          })
-        }
-      }
-
-      if (translated) {
-        toSave = translated.map((item, idx) => ({
-          ...item,
-          title: translated![idx]?.title || item.title,
-          description: translated![idx]?.description || item.description,
-          summary: translated![idx]?.summary,
-        }))
-      }
-    }
-
-    // 3. AI-извлечение структуры и сохранение
-    let total = 0
-    if (toSave.length > 0) {
-      err(`extracting startup structures from ${toSave.length} items via Gemini...`)
-      total = await extractAndSaveBatch(
-        toSave.map(item => ({
-          title: item.title,
-          description: (item as any).description || item.title,
-          url: item.url,
-          sourceName: item.source || item.sourceName,
-        }))
-      )
-      err(`AI-extracted and saved ${total} structured startup ideas`)
-    }
-
-    // 4. Channel sources
+    // First try OmniRoute batch
     try {
-        const { data: channels } = await supabase.from('channels').select('*').limit(1)
-        if (channels?.[0]) {
-            await processManualUrl(channels[0].url, 'стартап')
-        }
+      const res = await translateBatch(
+        collected.map((i) => ({ title: i.title, description: i.description || i.title }))
+      )
+      translated = collected.map((item, idx) => ({
+        ...item,
+        title: res[idx]?.title || item.title,
+        description: res[idx]?.description || item.description,
+        summary: res[idx]?.summary,
+      }))
+      err(`translated ${collected.length} items via OmniRoute`)
     } catch (e: any) {
-        err(`channel: ${e?.message || e}`)
+      err(`OmniRoute batch translation failed: ${e?.message || e}`)
     }
 
-    err(`total saved: ${total}`)
-    return { count: total, errors: [...errors] }
+    // Verify: if many items still fully English, force Gemini per-item retry
+    const englishCount = (translated ?? []).filter(
+      (it) => /[A-Za-z]/.test(it.title) && !/[А-Яа-яЁё]/.test(it.title)
+    ).length
+    if (!translated || englishCount > 0) {
+      const needs = translated
+        ? collected.filter((_, i) => {
+            const t = translated![i]
+            return /[A-Za-z]/.test(t.title) && !/[А-Яа-яЁё]/.test(t.title)
+          })
+        : collected
+      err(`${needs.length} items need Gemini translation`)
+
+      const geminiRes = await translateSingleGeminiBatch(
+        needs.map((i) => ({ title: i.title, description: i.description || i.title }))
+      )
+      if (geminiRes) {
+        translated = collected.map((item, idx) => {
+          const gemini = geminiRes[item.title]
+          if (
+            gemini &&
+            translated &&
+            /[A-Za-z]/.test(translated[idx].title) &&
+            !/[А-Яа-яЁё]/.test(translated[idx].title)
+          ) {
+            return { ...item, title: gemini.title, description: gemini.description }
+          }
+          return translated ? translated[idx] : item
+        })
+      }
+    }
+
+    if (translated) {
+      toSave = translated.map((item, idx) => ({
+        ...item,
+        title: translated![idx]?.title || item.title,
+        description: translated![idx]?.description || item.description,
+        summary: translated![idx]?.summary,
+      }))
+    }
+  }
+
+  // 3. AI-извлечение структуры и сохранение
+  let total = 0
+  if (toSave.length > 0) {
+    err(`extracting startup structures from ${toSave.length} items via Gemini...`)
+    total = await extractAndSaveBatch(
+      toSave.map((item) => ({
+        title: item.title,
+        description: (item as any).description || item.title,
+        url: item.url,
+        sourceName: item.source || item.sourceName,
+      }))
+    )
+    err(`AI-extracted and saved ${total} structured startup ideas`)
+  }
+
+  // 4. Channel sources
+  try {
+    const { data: channels } = await supabase.from('channels').select('*').limit(1)
+    if (channels?.[0]) {
+      await processManualUrl(channels[0].url, 'стартап')
+    }
+  } catch (e: any) {
+    err(`channel: ${e?.message || e}`)
+  }
+
+  err(`total saved: ${total}`)
+  return { count: total, errors: [...errors] }
 }
 
-async function translateSingleGemini(title: string, description: string): Promise<{ title: string; description: string } | null> {
+async function translateSingleGemini(
+  title: string,
+  description: string
+): Promise<{ title: string; description: string } | null> {
   try {
     const prompt = `Переведи заголовок и описание стартапа на русский язык. Сохрани термины и названия продуктов.
 Верни ТОЛЬКО JSON: {"title_ru":"...","description_ru":"..."}
@@ -373,7 +420,7 @@ export async function retranslateExisting(): Promise<{ updated: number; errors: 
         .update({
           title: t.title?.slice(0, 500) || item.title,
           description: (t.description || t.title || item.description)?.slice(0, 2000),
-          metadata: { ...meta, summary: t.summary || meta.summary, retranslated: true }
+          metadata: { ...meta, summary: t.summary || meta.summary, retranslated: true },
         })
         .eq('id', item.id)
 
@@ -404,7 +451,7 @@ export async function retranslateExisting(): Promise<{ updated: number; errors: 
           .update({
             title: result.title.slice(0, 500),
             description: (result.description || result.title).slice(0, 2000),
-            metadata: { ...meta, retranslated: true }
+            metadata: { ...meta, retranslated: true },
           })
           .eq('id', item.id)
 

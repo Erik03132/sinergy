@@ -4,6 +4,7 @@ import { translateBatch } from '../ai/translate'
 import { extractTelegramInfo, getRecentTelegramPosts } from './telegram'
 import * as cheerio from 'cheerio'
 import { BANNED_KEYWORDS } from './constants'
+import { resolveNewsVertical, normalizeVertical } from './vertical'
 
 export async function registerChannel(details: { title: string; url: string; sourceType: 'telegram' | 'web' }) {
   const supabase = await createClient()
@@ -182,7 +183,10 @@ export async function registerSource(details: any, type: 'telegram' | 'web') {
       source: 'automatic',
       title: idea.title,
       description: idea.summary,
-      vertical: idea.vertical || 'Новости',
+      vertical:
+        idea.vertical && normalizeVertical(idea.vertical).startsWith('News')
+          ? normalizeVertical(idea.vertical)
+          : resolveNewsVertical(idea.title, idea.summary),
       original_url: details.url,
       is_synergy: false,
       core_tech: idea.core_tech ? [idea.core_tech] : [],
