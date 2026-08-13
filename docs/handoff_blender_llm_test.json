@@ -1,0 +1,36 @@
+{
+  "project": "sinergy",
+  "task": "Починить обновление новостей (cron перестал работать 13.08) + блендер упирается в LLM rate-limit",
+  "context": "Сессия вечер 13.08.2026. Пользователь сообщил: последнее обновление новостей 12.08 — больше не обновляется. Диагноз подтверждён: CRON_SECRET отсутствовал в Vercel prod env → cron Vercel получал 401 (route требует Bearer) → discovery не запускался, обновлений не было. ДОБАВЛЕН CRON_SECRET в Vercel (хранится в /tmp/cron_secret.txt, не коммитить). Также задеплоен коммит dd06c59 (single-pass omni fallback на OpenRouter при 429 + saveSynergy try/catch + maxDuration=300 у cron и find-next). Авторизация cron работает (ручной вызов с заголовком проходит, не 401). НО ручное обновление через прод-cron не подтвердилось: за 250с не завершилось и запись в cron_logs за 13.08 НЕ появилась. Возможные причины: discovery слишком долгий (translateBatch через OmniRoute 429 + OpenRouter медленный) и/или не хватает maxDuration. Завтра доработать.",
+  "files": [
+    "src/app/api/cron/daily-feed/route.ts",
+    "src/lib/sinergy/discovery.ts",
+    "src/lib/sinergy/source-processor.ts",
+    "src/lib/ai/translate.ts",
+    "src/lib/ai/omni.ts",
+    "src/lib/ai/openrouter.ts",
+    "src/app/api/sinergy/find-next/route.ts",
+    "src/lib/sinergy/agents/orchestrator.ts",
+    "vercel.json"
+  ],
+  "skills": ["deployment", "bot-development"],
+  "next_steps": [
+    "1. Проверить, появилась ли запись cron_logs за 13.08 (ручной вызов мог завершиться после ухода). Если есть success — обновление работает.",
+    "2. Если нет: discovery не успевает за maxDuration. Ускорить: в cron-режиме при недоступности LLM (429/403) сохранять сырые items СРАЗУ (без перевода/структуры), перевод откладывать. Сейчас discovery блокирует сохранение на translateBatch+Gemini.",
+    "3. Проверить следующий cron 14.08 05:00 — сработает ли (Vercel шлёт Authorization автоматически).",
+    "4. Блендер: проверить, что find-next теперь быстрее (single-pass omni). Для надёжности рассмотреть подключение omni-auto-router :8123 (free-only) как primary/fallback.",
+    "5. Прогнать npm run pre-deploy перед пушем."
+  ],
+  "escalation": false,
+  "deadline": null,
+  "key_findings": [
+    "ПРИЧИНА остановки новостей: CRON_SECRET отсутствовал в Vercel env → cron 401 (Vercel шлёт Authorization: Bearer CRON_SECRET, route сверяет). Добавлен секрет (48 hex в /tmp/cron_secret.txt).",
+    "Крон cron_logs за 13.08 НЕ появился даже после фикса — ручной прод-cron за 250с не завершился. Discovery слишком долгий на LLM-переводах при 429/403.",
+    "Задеплоено: dd06c59 (omni single-pass, openrouter порядок моделей, saveSynergy try/catch, maxDuration cron/find-next=300). Прод: sinergy-tau-seven.vercel.app.",
+    "Идеи в БД: total 1170; вертикали (13.08): News=1118, News (AI)=11, Новости=0, History=33, EdTech=1, Other=6. Фид отдаёт 200.",
+    "Vercel cron docs: авторизация через CRON_SECRET (Vercel добавляет Authorization автоматически). maxDuration лимитируется планом (Hobby ≤60s; эффективно надо ускорить discovery).",
+    "openrouter.ts free-модели проверены 13.08 с Mac: gpt-oss-20b:free, nemotron-3-ultra-550b-a55b:free, gemma-4-26b-a4b-it:free, cohere/north-mini-code:free, inclusionai/ling-3.0-tiny:free, openrouter/free — все 200. deepseek-v3.2:free и qwen3.5-flash:free нерабочие (убраны).",
+    "OmniRoute :20128 в dev: только oc/deepseek-v4-flash-free активна (429 rate-limit), остальные oc/* 401. Рабочий каскад: omni-auto-router :8123 модель free-only (Ollama qwen2.5:7b + free OpenRouter).",
+    "saveSynergy фикс: заменён .catch на try/catch (был баг '.catch is not a function'). Коммит dd06c59."
+  ]
+}
