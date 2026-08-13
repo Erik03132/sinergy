@@ -50,24 +50,20 @@ export async function askOmni(prompt: string, system?: string): Promise<string> 
   ]
 
   // Primary: OmniRoute → провайдер OpenCode (DeepSeek Flash)
-  for (let pass = 0; pass < 3; pass++) {
-    for (const model of OMNI_MODELS) {
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 120000)
-      try {
-        console.log(`🔄 OmniRoute (${model})...`)
-        const result = await tryModel(model, messages, controller.signal)
-        return result
-      } catch (e: any) {
-        const isRateLimit = /429|rate|limit/i.test(e.message)
-        console.warn(`⚠️ OmniRoute ${model}: ${e.message}${isRateLimit ? ' (rate-limited)' : ''}`)
-        if (isRateLimit) await sleep(2000)
-      } finally {
-        clearTimeout(timer)
-      }
+  // При 429 повторы бесполезны (лимит не сбрасывается за секунды) — сразу уходим в fallback
+  for (const model of OMNI_MODELS) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 60000)
+    try {
+      console.log(`🔄 OmniRoute (${model})...`)
+      const result = await tryModel(model, messages, controller.signal)
+      return result
+    } catch (e: any) {
+      const isRateLimit = /429|rate|limit/i.test(e.message)
+      console.warn(`⚠️ OmniRoute ${model}: ${e.message}${isRateLimit ? ' (rate-limited → OpenRouter)' : ''}`)
+    } finally {
+      clearTimeout(timer)
     }
-    console.warn(`OmniRoute pass ${pass + 1} exhausted, retrying...`)
-    await sleep(3000)
   }
 
   console.warn('OmniRoute exhausted, falling back to OpenRouter free...')
