@@ -11,10 +11,11 @@ interface OpenRouterResponse {
   }>
 }
 
-// Актуальные бесплатные модели OpenRouter (проверены 13.08.2026: все отвечают 200)
+// Актуальные бесплатные модели OpenRouter (проверены 13-15.08.2026: nemotron отвечает 200,
+// gpt-oss-20b:free даёт 429). nemotron — самый надёжный, ставим первым.
 const OR_MODELS = [
-  'openai/gpt-oss-20b:free', // OpenAI OSS 20B
   'nvidia/nemotron-3-ultra-550b-a55b:free', // 1M контекст, самая мощная бесплатная
+  'openai/gpt-oss-20b:free', // OpenAI OSS 20B (часто 429 — запасной)
   'google/gemma-4-26b-a4b-it:free', // Google Gemma 4 26B
   'cohere/north-mini-code:free', // Cohere North Mini
   'inclusionai/ling-3.0-tiny:free', // Ling 3.0 Tiny

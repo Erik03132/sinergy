@@ -12,7 +12,8 @@ const OMNIROUTE_URL = process.env.OMNIROUTE_URL || 'http://localhost:20128/v1/ch
 // Бесплатные модели VPS, проверены 14.08.2026 (все отвечают 200 через US-прокси)
 const OMNI_MODELS = ['free-cascade', 'auto/best-free', 'auto/cheap', 'auto/fast', 'oc/deepseek-v4-flash-free']
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+const VPS_TIMEOUT_MS = 15000
+const VPS_HEALTHCHECK_MS = 5000
 
 async function tryModel(
   model: string,
@@ -44,6 +45,33 @@ async function tryModel(
   throw new Error('empty response')
 }
 
+// VPS OmniRoute может быть недоступен из некоторых окружений (напр. Vercel,
+// где firewall блокирует IP). Быстрый healthcheck чтобы не висеть по 60s на каждой модели.
+// Результат кешируется на 60s в рамках процесса (Vercel serverless — один блендер = один процесс).
+let vpsAvailability: boolean | null = null
+let vpsCheckedAt = 0
+
+async function isVpsAvailable(): Promise<boolean> {
+  const now = Date.now()
+  if (vpsAvailability !== null && now - vpsCheckedAt < 60000) return vpsAvailability
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), VPS_HEALTHCHECK_MS)
+  try {
+    // Лёгкий GET: если соединение установлено (даже 404/405) — хост жив.
+    // При silent drop (firewall) — таймаут → считаем недоступным.
+    const response = await fetch(OMNIROUTE_URL, { method: 'GET', signal: controller.signal })
+    vpsAvailability = true
+    return true
+  } catch {
+    vpsAvailability = false
+    return false
+  } finally {
+    vpsCheckedAt = now
+    clearTimeout(timer)
+  }
+}
+
 export async function askOmni(prompt: string, system?: string): Promise<string> {
   const messages = [
     ...(system ? [{ role: 'system' as const, content: system }] : []),
@@ -52,21 +80,25 @@ export async function askOmni(prompt: string, system?: string): Promise<string> 
 
   // Primary: OmniRoute → провайдер OpenCode (DeepSeek Flash)
   // При 429 повторы бесполезны (лимит не сбрасывается за секунды) — сразу уходим в fallback
-  for (const model of OMNI_MODELS) {
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), 60000)
-    try {
-      console.log(`🔄 OmniRoute (${model})...`)
-      const result = await tryModel(model, messages, controller.signal)
-      return result
-    } catch (e: any) {
-      const isRateLimit = /429|rate|limit/i.test(e.message)
-      console.warn(`⚠️ OmniRoute ${model}: ${e.message}${isRateLimit ? ' (rate-limited → OpenRouter)' : ''}`)
-    } finally {
-      clearTimeout(timer)
+  if (await isVpsAvailable()) {
+    for (const model of OMNI_MODELS) {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), VPS_TIMEOUT_MS)
+      try {
+        console.log(`🔄 OmniRoute (${model})...`)
+        const result = await tryModel(model, messages, controller.signal)
+        return result
+      } catch (e: any) {
+        const isRateLimit = /429|rate|limit/i.test(e.message)
+        console.warn(`⚠️ OmniRoute ${model}: ${e.message}${isRateLimit ? ' (rate-limited → OpenRouter)' : ''}`)
+      } finally {
+        clearTimeout(timer)
+      }
     }
+    console.warn('OmniRoute exhausted, falling back to OpenRouter free...')
+  } else {
+    console.warn('⚠️ VPS OmniRoute недоступен, сразу OpenRouter free...')
   }
 
-  console.warn('OmniRoute exhausted, falling back to OpenRouter free...')
   return await askOpenRouter(prompt)
 }
