@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { processManualUrl, extractAndSaveBatch } from './source-processor'
+import { processManualUrl, saveRawItems } from './source-processor'
 import { getHNShow } from './hackernews'
 import { getProductHuntTrending } from './producthunt'
 import { getDevToStartupPosts } from './devto'
@@ -7,8 +7,9 @@ import { getRedditStartupPosts } from './reddit'
 import { getIndieHackersPosts } from './indiehackers'
 import { getTechCrunchStartupPosts } from './techcrunch'
 import { getAllRSSFeeds } from './rss-sources'
-import { translateBatch } from '@/lib/ai/translate'
 import { askGemini } from '@/lib/ai/gemini'
+import { translateBatch } from '@/lib/ai/translate'
+import { resolveNewsVertical } from './vertical'
 
 export interface DiscoveryResult {
   count: number
@@ -217,82 +218,36 @@ export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
   }
   err(`collected ${collected.length} new items total`)
 
-  // 2. Translate everything to Russian — Gemini primary
-  let toSave: PendingItem[] = collected
-  if (collected.length > 0) {
-    let translated: (PendingItem & { summary?: string })[] | null = null
-
-    // First try OmniRoute batch
-    try {
-      const res = await translateBatch(
-        collected.map((i) => ({ title: i.title, description: i.description || i.title }))
-      )
-      translated = collected.map((item, idx) => ({
-        ...item,
-        title: res[idx]?.title || item.title,
-        description: res[idx]?.description || item.description,
-        summary: res[idx]?.summary,
-      }))
-      err(`translated ${collected.length} items via OmniRoute`)
-    } catch (e: any) {
-      err(`OmniRoute batch translation failed: ${e?.message || e}`)
-    }
-
-    // Verify: if many items still fully English, force Gemini per-item retry
-    const englishCount = (translated ?? []).filter(
-      (it) => /[A-Za-z]/.test(it.title) && !/[А-Яа-яЁё]/.test(it.title)
-    ).length
-    if (!translated || englishCount > 0) {
-      const needs = translated
-        ? collected.filter((_, i) => {
-            const t = translated![i]
-            return /[A-Za-z]/.test(t.title) && !/[А-Яа-яЁё]/.test(t.title)
-          })
-        : collected
-      err(`${needs.length} items need Gemini translation`)
-
-      const geminiRes = await translateSingleGeminiBatch(
-        needs.map((i) => ({ title: i.title, description: i.description || i.title }))
-      )
-      if (geminiRes) {
-        translated = collected.map((item, idx) => {
-          const gemini = geminiRes[item.title]
-          if (
-            gemini &&
-            translated &&
-            /[A-Za-z]/.test(translated[idx].title) &&
-            !/[А-Яа-яЁё]/.test(translated[idx].title)
-          ) {
-            return { ...item, title: gemini.title, description: gemini.description }
-          }
-          return translated ? translated[idx] : item
-        })
-      }
-    }
-
-    if (translated) {
-      toSave = translated.map((item, idx) => ({
-        ...item,
-        title: translated![idx]?.title || item.title,
-        description: translated![idx]?.description || item.description,
-        summary: translated![idx]?.summary,
-      }))
-    }
-  }
-
-  // 3. AI-извлечение структуры и сохранение
+  // 2. Критический путь: сохраняем сырые новости сразу (без LLM),
+  //    чтобы фид обновлялся даже при 429/таймаутах AI
   let total = 0
-  if (toSave.length > 0) {
-    err(`extracting startup structures from ${toSave.length} items via Gemini...`)
-    total = await extractAndSaveBatch(
-      toSave.map((item) => ({
-        title: item.title,
-        description: (item as any).description || item.title,
-        url: item.url,
-        sourceName: item.source || item.sourceName,
+  if (collected.length > 0) {
+    total = await saveRawItems(
+      collected.map((i) => ({
+        title: i.title,
+        description: i.description || i.title,
+        url: i.url,
+        sourceName: i.source || i.sourceName,
       }))
     )
-    err(`AI-extracted and saved ${total} structured startup ideas`)
+    err(`raw saved: ${total} items`)
+  }
+
+  // 3. Best-effort обогащение (перевод + структура), ограничено дедлайном,
+  //    чтобы не блокировать cron при недоступном LLM
+  if (collected.length > 0) {
+    try {
+      await enrichRawItems(
+        collected.map((i) => ({
+          title: i.title,
+          description: i.description || i.title,
+          url: i.url,
+          sourceName: i.source || i.sourceName,
+        }))
+      )
+    } catch (e: any) {
+      err(`enrichment skipped: ${e?.message || e}`)
+    }
   }
 
   // 4. Channel sources
@@ -307,6 +262,71 @@ export async function fetchAndStoreFeed(): Promise<DiscoveryResult> {
 
   err(`total saved: ${total}`)
   return { count: total, errors: [...errors] }
+}
+
+const ENRICH_DEADLINE_MS = 120000
+
+/**
+ * Обогащение сырых новостей: перевод на русский + AI-структура.
+ * Обновляет уже сохранённые raw-строки (не вставляет новые).
+ * Работает до дедлайна; при недоступности LLM просто завершается.
+ */
+async function enrichRawItems(
+  items: { title: string; description: string; url: string; sourceName: string }[]
+): Promise<void> {
+  const supabase = await createClient()
+  const CONCURRENCY = 2
+  let cursor = 0
+  const deadline = Date.now() + ENRICH_DEADLINE_MS
+
+  async function worker() {
+    while (cursor < items.length) {
+      const item = items[cursor++]
+      if (Date.now() > deadline) return
+      try {
+        const { data: rows } = await supabase.from('ideas').select('id, metadata').eq('original_url', item.url).limit(1)
+        if (!rows || rows.length === 0) continue
+        if (rows[0].metadata?.is_extracted) continue
+
+        const prompt = `Переведи заголовок и описание стартапа/новости на русский язык. Сохрани термины и названия продуктов. Верни ТОЛЬКО JSON: {"title_ru":"...","description_ru":"..."}
+
+title: ${item.title}
+description: ${item.description || item.title}`
+        let title = item.title
+        let description = item.description || item.title
+        try {
+          const raw = await askGemini(prompt)
+          const json = raw.match(/\{[\s\S]*\}/)
+          if (json) {
+            const parsed = JSON.parse(json[0])
+            if (parsed.title_ru) title = parsed.title_ru
+            if (parsed.description_ru) description = parsed.description_ru
+          }
+        } catch (e: any) {
+          err(`enrich translate failed for ${item.title.slice(0, 40)}: ${e?.message}`)
+        }
+
+        await supabase
+          .from('ideas')
+          .update({
+            title: title.slice(0, 500),
+            description: description.slice(0, 2000),
+            vertical: resolveNewsVertical(title, description),
+            metadata: {
+              ...(rows[0].metadata || {}),
+              is_extracted: true,
+              raw_fallback: false,
+              enriched_at: new Date().toISOString(),
+            },
+          })
+          .eq('id', rows[0].id)
+      } catch (e: any) {
+        err(`enrich failed for ${item.title.slice(0, 40)}: ${e?.message}`)
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, () => worker()))
 }
 
 async function translateSingleGemini(

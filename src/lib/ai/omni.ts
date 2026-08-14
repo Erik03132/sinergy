@@ -1,7 +1,7 @@
 /**
- * OmniRoute клиент — локальный :20128 (провайдер OpenCode, тариф Go).
- * Primary: oc/deepseek-v4-flash-free (бесплатная модель DeepSeek Flash).
- * Fallback: прямой OpenRouter с бесплатными моделями (ключ из env).
+ * OmniRoute клиент — VPS :20128 (провайдер OpenCode, тариф Go).
+ * Primary: бесплатный каскад free-cascade (авто-роутинг по free-моделям).
+ * Fallback: auto/best-free → auto/cheap → oc/deepseek-v4-flash-free → прямой OpenRouter.
  * Адрес OmniRoute берётся из OMNIROUTE_URL (по умолчанию — локальный).
  */
 
@@ -9,7 +9,8 @@ import { askOpenRouter } from './openrouter'
 
 const OMNIROUTE_URL = process.env.OMNIROUTE_URL || 'http://localhost:20128/v1/chat/completions'
 
-const OMNI_MODELS = ['oc/deepseek-v4-flash-free']
+// Бесплатные модели VPS, проверены 14.08.2026 (все отвечают 200 через US-прокси)
+const OMNI_MODELS = ['free-cascade', 'auto/best-free', 'auto/cheap', 'auto/fast', 'oc/deepseek-v4-flash-free']
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 

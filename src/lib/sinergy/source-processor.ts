@@ -47,7 +47,7 @@ function shortHash(input: string, length: number = 8): string {
   return Math.abs(hash).toString(36).substring(0, length)
 }
 
-export async function registerSource(details: any, type: 'telegram' | 'web') {
+export async function registerSource(details: any, type: 'telegram' | 'web'): Promise<number> {
   const supabase = await createClient()
 
   // Быстрый фильтр (Уже парсили этот URL?)
@@ -56,7 +56,7 @@ export async function registerSource(details: any, type: 'telegram' | 'web') {
 
     if (urlCheck && urlCheck.length > 0) {
       console.log(`[Processor] URL already processed, skipping: ${details.url}`)
-      return
+      return 0
     }
   }
 
@@ -66,7 +66,7 @@ export async function registerSource(details: any, type: 'telegram' | 'web') {
   // 1. Быстрый фильтр (Анти-шум по ключевым словам)
   if (isContentBanned(content)) {
     console.log(`[Processor] Source text is BANNED, skipping AI call for: ${details.url.substring(0, 30)}...`)
-    return
+    return 0
   }
 
   // 2. Семантический классификатор и извлечение "Якорей" (Target Audience, Pain Point, Solution, Monetization)
@@ -161,6 +161,7 @@ export async function registerSource(details: any, type: 'telegram' | 'web') {
     }
   }
 
+  let saved = 0
   for (const idea of extractedIdeas) {
     if (!idea.title || !idea.summary) continue
 
@@ -207,9 +208,52 @@ export async function registerSource(details: any, type: 'telegram' | 'web') {
     }
 
     const { error } = await supabase.from('ideas').insert(insertData)
-    if (!error) console.log(`[Processor] Saved Concept: ${idea.title} (Score: ${idea.score})`)
-    else console.error('[Processor] Saving error:', error.message)
+    if (!error) {
+      console.log(`[Processor] Saved Concept: ${idea.title} (Score: ${idea.score})`)
+      saved++
+    } else console.error('[Processor] Saving error:', error.message)
   }
+
+  // Fallback: AI не вернул структуру (429/таймаут/пустой ответ) — сохраняем сырую новость,
+  // чтобы фид не останавливался. AI-структуризация произойдёт позже при повторе скана.
+  if (saved === 0 && extractedIdeas.length === 0 && content && details.title) {
+    const externalId = `${shortHash(details.url || details.title, 15)}_raw`
+    const { data: existing } = await supabase.from('ideas').select('id').eq('title', details.title.trim()).limit(1)
+    if (existing && existing.length > 0) {
+      console.log(`[Processor] RAW fallback: title already exists: ${details.title}`)
+      return 0
+    }
+    const rawInsert = {
+      source: 'automatic',
+      title: details.title,
+      description: content.slice(0, 2000),
+      vertical: resolveNewsVertical(details.title, content),
+      original_url: details.url || null,
+      is_synergy: false,
+      core_tech: [],
+      target_audience: 'Общая',
+      business_model: 'Стартап',
+      pain_point: [],
+      temporal_marker: new Date().toISOString().split('T')[0],
+      metadata: {
+        external_id: externalId,
+        type: type,
+        author: details.channelTitle || details.channelHandle || 'Веб-источник',
+        thumbnail: details.imageUrl || null,
+        is_extracted: false,
+        scanned_at: new Date().toISOString(),
+        is_auto: true,
+        raw_fallback: true,
+      },
+    }
+    const { error } = await supabase.from('ideas').insert(rawInsert)
+    if (!error) {
+      console.log(`[Processor] Saved RAW fallback: ${details.title}`)
+      saved++
+    } else console.error('[Processor] RAW fallback saving error:', error.message)
+  }
+
+  return saved
 }
 
 export async function extractAndSaveBatch(
@@ -223,7 +267,7 @@ export async function extractAndSaveBatch(
     while (cursor < items.length) {
       const item = items[cursor++]
       try {
-        await registerSource(
+        const count = await registerSource(
           {
             id: shortHash(item.url, 20),
             title: item.title,
@@ -234,7 +278,7 @@ export async function extractAndSaveBatch(
           },
           'web'
         )
-        saved++
+        saved += count
       } catch (e: any) {
         console.error(`[extractAndSaveBatch] Failed for "${item.title.slice(0, 50)}": ${e.message}`)
       }
@@ -242,6 +286,61 @@ export async function extractAndSaveBatch(
   }
 
   await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, () => worker()))
+  return saved
+}
+
+/**
+ * Быстрое сохранение сырых новостей (без LLM).
+ * Критический путь cron: фид обновляется даже при недоступности AI.
+ */
+export async function saveRawItems(
+  items: { title: string; description: string; url: string; sourceName: string }[]
+): Promise<number> {
+  const supabase = await createClient()
+  let saved = 0
+
+  for (const item of items) {
+    if (!item.title || !item.url) continue
+
+    // Дубликаты по URL
+    const { data: byUrl } = await supabase.from('ideas').select('id').eq('original_url', item.url).limit(1)
+    if (byUrl && byUrl.length > 0) continue
+
+    // Дубликаты по title
+    const { data: byTitle } = await supabase.from('ideas').select('id').eq('title', item.title.trim()).limit(1)
+    if (byTitle && byTitle.length > 0) continue
+
+    const externalId = `${shortHash(item.url, 15)}_raw`
+    const { error } = await supabase.from('ideas').insert({
+      source: 'automatic',
+      title: item.title.slice(0, 500),
+      description: (item.description || item.title).slice(0, 2000),
+      vertical: resolveNewsVertical(item.title, item.description || item.title),
+      original_url: item.url,
+      is_synergy: false,
+      core_tech: [],
+      target_audience: 'Общая',
+      business_model: 'Стартап',
+      pain_point: [],
+      temporal_marker: new Date().toISOString().split('T')[0],
+      metadata: {
+        external_id: externalId,
+        type: 'web',
+        author: item.sourceName || 'RSS',
+        thumbnail: null,
+        is_extracted: false,
+        scanned_at: new Date().toISOString(),
+        is_auto: true,
+        raw_fallback: true,
+      },
+    })
+    if (error) {
+      console.error('[saveRawItems] Saving error:', error.message)
+    } else {
+      saved++
+    }
+  }
+
   return saved
 }
 
