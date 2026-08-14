@@ -134,7 +134,7 @@ function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
   const selected: PairCandidate[] = []
 
   for (const pair of top50) {
-    if (selected.length >= 10) break
+    if (selected.length >= 3) break
     if (usedIdeaIds.has(pair.a.id) || usedIdeaIds.has(pair.b.id)) continue
     usedIdeaIds.add(pair.a.id)
     usedIdeaIds.add(pair.b.id)
@@ -142,9 +142,9 @@ function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
   }
 
   // If not enough diverse pairs, add remaining top scorers
-  if (selected.length < 5) {
+  if (selected.length < 3) {
     for (const pair of top50) {
-      if (selected.length >= 10) break
+      if (selected.length >= 3) break
       if (
         selected.some(
           (p) => p.a.id === pair.a.id || p.b.id === pair.b.id || p.a.id === pair.b.id || p.b.id === pair.a.id
@@ -234,6 +234,10 @@ export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {
     }
 
     results.push(result)
+
+    // Достаточно одной синергии за вызов (route.ts берёт results[0]).
+    // Прерываем цикл, чтобы не делать десятки LLM-вызовов и не превышать лимит Vercel.
+    if (results.length >= 1) break
   }
 
   return results
