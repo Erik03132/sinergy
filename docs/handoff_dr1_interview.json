@@ -1,0 +1,21 @@
+{
+  "project": "sinergy",
+  "task": "DR-1: UI-гейт интервью-режима (сделано) + деплой и проверка в проде",
+  "context": "Интервью-режим DR-1 завершён на уровне кода: (1) classify API принимает interview_answers и использует их в промпте Gemini; (2) add/page.tsx — двухшаговый флоу (форма → уточняющие вопросы → сохранение); (3) типы InterviewQuestion/InterviewAnswers добавлены в types/sinergy.ts; (4) interview/route.ts переведён на общий тип. Build OK, eval_sinergy 12/12 (100%). НЕ задеплоено на Vercel. ESLint-конфиг проекта сломан (циклическая ссылка react в eslintrc) — предсуществующая проблема, линт не запускается вообще.",
+  "files": [
+    "src/app/sinergy/add/page.tsx",
+    "src/app/api/sinergy/classify/route.ts",
+    "src/app/api/sinergy/interview/route.ts",
+    "src/types/sinergy.ts"
+  ],
+  "skills": ["web-standards", "workflow"],
+  "next_steps": [
+    "1. Закоммитить изменения (conventional commit: feat:) — правило проекта: коммит после изменений обязателен",
+    "2. Деплой на Vercel (git push → авто-деплой; проверить /sinergy/add в проде)",
+    "3. Smoke-тест в проде: добавить идею → проверить появление вопросов → ответить → сохранение в Архив",
+    "4. (Опц.) Починить eslint.config.mjs — циклическая зависимость в extends ломает npm run lint",
+    "5. Обновить ACTIVE_TASKS.md: DR-1 → ✅ после продакшен-проверки"
+  ],
+  "escalation": false,
+  "deadline": "2026-08-11T18:00:00"
+}
