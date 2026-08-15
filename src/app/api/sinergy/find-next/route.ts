@@ -10,7 +10,9 @@ export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const body = await req.json().catch(() => ({}))
-    const mode: AgentMode = body.mode || 'full'
+    // det-only (только Builder, 1 LLM-вызов) укладывается в 60s Vercel hobby-лимит.
+    // full (Builder + Optimist + Skeptic = 3 вызова) превышает лимит → timeout.
+    const mode: AgentMode = body.mode || 'det-only'
 
     const { data: ideas, error } = await supabase
       .from('ideas')
