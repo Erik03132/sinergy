@@ -18,11 +18,11 @@ const OMNI_MODELS = ['auto/fast', 'auto/best-free', 'auto/cheap', 'free-cascade'
 // Сумма VPS-таймаутов (5 моделей × 4s = 20s) + OpenRouter (3s) = 23s < 60s лимита Vercel.
 const VPS_TIMEOUT_MS = 4000
 
-// VPS OmniRoute (провайдер OpenCode) недоступен из Vercel: firewall пропускает TCP-порт,
-// но провайдер дропает IP Vercel на уровне ответа LLM → fetch висит (abort не прерывает
-// TCP-hang). Поэтому в проде VPS отключён через OMNIROUTE_ENABLED=false (Vercel env),
-// блендер сразу идёт на OpenRouter free. Локально флаг не задан → VPS работает.
-const OMNIROUTE_ENABLED = process.env.OMNIROUTE_ENABLED !== 'false'
+// VPS OmniRoute (провайдер OpenCode) 15.08.2026 УПАЛ: у провайдера исчерпаны OpenRouter credits
+// ("Insufficient credits"). VPS включается ТОЛЬКО при явном OMNIROUTE_ENABLED=true.
+// По умолчанию (флаг не задан) — сразу OpenRouter free (наш ключ, nemotron, стабильно).
+// Когда VPS починят — выставить OMNIROUTE_ENABLED=true в Vercel env.
+const OMNIROUTE_ENABLED = process.env.OMNIROUTE_ENABLED === 'true'
 
 async function tryModel(
   model: string,
