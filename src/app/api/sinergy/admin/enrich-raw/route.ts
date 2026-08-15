@@ -8,15 +8,17 @@ export const maxDuration = 300
 const EXTRACT_PROMPT = (
   title: string,
   description: string
-) => `Ты — аналитик стартапов. Извлеки структуру из новости/стартапа.
+) => `Ты — аналитик стартапов. Извлеки структуру из новости/стартапа и напиши подробное саммари.
 Верни ТОЛЬКО валидный JSON без пояснений:
 {
+  "title_ru": "перевод заголовка на русский (сохрани названия продуктов/компаний)",
   "vertical": "реальная категория из списка: FinTech, HealthTech, EdTech, AI-infrastructure, DevTools, E-commerce, SaaS, Marketplace, Productivity, LegalTech, HR-tech, ClimateTech, Creator-economy, Gaming, Crypto, BioTech, Robotics, Logistics. НЕ используй 'News'/'News (AI)'",
   "core_tech": ["массив ключевых технологий, напр. AI, Blockchain, Computer Vision, NLP, IoT"],
   "target_audience": "кто целевой пользователь (кратко)",
   "business_model": "модель монетизации: SaaS, Marketplace, Subscription, Freemium, B2B, B2C, Transaction-fee, Hardware",
   "pain_point": "какую проблему решает (кратко)",
-  "temporal_marker": "Сейчас | 1-2 года | 3-5 лет"
+  "temporal_marker": "Сейчас | 1-2 года | 3-5 лет",
+  "summary": "подробное саммари новости на русском, 3-4 предложения, передай суть и значимость для стартапов"
 }
 
 title: ${title}
@@ -71,6 +73,8 @@ export async function POST(req: Request) {
       const { error: updErr } = await supabase
         .from('ideas')
         .update({
+          title: parsed.title_ru ? parsed.title_ru.slice(0, 500) : item.title,
+          description: (parsed.summary || item.description || '').slice(0, 2000),
           vertical: parsed.vertical,
           core_tech: Array.isArray(parsed.core_tech) ? parsed.core_tech : [],
           target_audience: parsed.target_audience || 'Общая',
@@ -82,6 +86,7 @@ export async function POST(req: Request) {
             is_extracted: true,
             raw_fallback: false,
             enriched_at: new Date().toISOString(),
+            summary: parsed.summary || '',
           },
         })
         .eq('id', item.id)
