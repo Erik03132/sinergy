@@ -266,7 +266,6 @@ export async function saveSynergy(supabase: any, result: SynergyResult, a: Idea,
 
   const newIdea = {
     source: 'synergy',
-    source_type: 'synergy',
     title: result.synergy_title,
     description: result.synergy_description || '',
     is_favorite: false,
