@@ -9,8 +9,9 @@ import { askOpenRouter } from './openrouter'
 
 const OMNIROUTE_URL = process.env.OMNIROUTE_URL || 'http://localhost:20128/v1/chat/completions'
 
-// Бесплатные модели VPS, проверены 14.08.2026 (все отвечают 200 через US-прокси)
-const OMNI_MODELS = ['free-cascade', 'auto/best-free', 'auto/cheap', 'auto/fast', 'oc/deepseek-v4-flash-free']
+// Бесплатные модели VPS, проверены 14-15.08.2026. auto/fast — самый быстрый (1.5s),
+// free-cascade часто перегружен (до 30s+). Порядок: от быстрого к медленному.
+const OMNI_MODELS = ['auto/fast', 'auto/best-free', 'auto/cheap', 'free-cascade', 'oc/deepseek-v4-flash-free']
 
 const VPS_TIMEOUT_MS = 15000
 
@@ -32,7 +33,7 @@ async function tryModel(
       model,
       messages,
       temperature: 0.3,
-      max_tokens: 8192,
+      max_tokens: 2048,
       stream: false,
     }),
     signal,

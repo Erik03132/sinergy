@@ -63,13 +63,13 @@ export async function POST(req: Request) {
   let updated = 0
   let failed = 0
 
-  for (const item of toEnrich) {
+  async function enrichOne(item: any) {
     try {
       const raw = await askGemini(EXTRACT_PROMPT(item.title, item.description || ''))
       const parsed = parseJson(raw)
       if (!parsed || !parsed.vertical) {
         failed++
-        continue
+        return
       }
       const { error: updErr } = await supabase
         .from('ideas')
@@ -98,6 +98,13 @@ export async function POST(req: Request) {
       failed++
       console.error('enrich item failed:', e?.message)
     }
+  }
+
+  // Параллельная обработка чанками (concurrency 3) для ускорения
+  const CONCURRENCY = 3
+  for (let i = 0; i < toEnrich.length; i += CONCURRENCY) {
+    const chunk = toEnrich.slice(i, i + CONCURRENCY)
+    await Promise.all(chunk.map((item) => enrichOne(item)))
   }
 
   const remaining =
