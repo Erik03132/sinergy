@@ -13,7 +13,10 @@ const OMNIROUTE_URL = process.env.OMNIROUTE_URL || 'http://localhost:20128/v1/ch
 // free-cascade часто перегружен (до 30s+). Порядок: от быстрого к медленному.
 const OMNI_MODELS = ['auto/fast', 'auto/best-free', 'auto/cheap', 'free-cascade', 'oc/deepseek-v4-flash-free']
 
-const VPS_TIMEOUT_MS = 15000
+// VPS OmniRoute (провайдер OpenCode) нестабилен из Vercel: часто hangs/empty до 30s+.
+// Короткий таймаут (4s) — быстро уходим в fallback на OpenRouter (nemotron ~3s).
+// Сумма VPS-таймаутов (5 моделей × 4s = 20s) + OpenRouter (3s) = 23s < 60s лимита Vercel.
+const VPS_TIMEOUT_MS = 4000
 
 // VPS OmniRoute (провайдер OpenCode) недоступен из Vercel: firewall пропускает TCP-порт,
 // но провайдер дропает IP Vercel на уровне ответа LLM → fetch висит (abort не прерывает
