@@ -1,4 +1,3 @@
-
 import { askGemini } from '@/lib/ai/gemini'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -10,45 +9,47 @@ export const runtime = 'nodejs'
 export const maxDuration = 60
 
 const classifySchema = z.object({
-    title: z.string().min(1, "Название не может быть пустым"),
-    description: z.string().min(1, "Описание не может быть пустым"),
-    is_favorite: z.boolean().optional().default(false),
-    source: z.enum(['user', 'synergy']).optional().default('user'),
-    vertical: z.string().optional(),
-    core_tech: z.array(z.string()).optional(),
-    target_audience: z.string().optional(),
-    business_model: z.string().optional(),
-    interview_answers: z.record(z.string()).optional(),
+  title: z.string().min(1, 'Название не может быть пустым'),
+  description: z.string().min(1, 'Описание не может быть пустым'),
+  is_favorite: z.boolean().optional().default(false),
+  source: z.enum(['user', 'synergy']).optional().default('user'),
+  vertical: z.string().optional(),
+  core_tech: z.array(z.string()).optional(),
+  target_audience: z.string().optional(),
+  business_model: z.string().optional(),
+  interview_answers: z.record(z.string()).optional(),
 })
 
 export async function POST(req: NextRequest) {
-    try {
-        const body = await req.json()
-        const parsed = classifySchema.parse(body)
-        const { title, description, is_favorite, source } = parsed
+  try {
+    const body = await req.json()
+    const parsed = classifySchema.parse(body)
+    const { title, description, is_favorite, source } = parsed
 
-        let classification
+    let classification
 
-        // If pre-classified (e.g. from Blender), skip AI
-        if (parsed.vertical && parsed.core_tech) {
-            classification = {
-                vertical: parsed.vertical,
-                core_tech: parsed.core_tech,
-                target_audience: parsed.target_audience || 'General',
-                business_model: parsed.business_model || 'TBD',
-                pain_point: ['(Pre-classified)'],
-                temporal_marker: 'Now',
-                budget_estimate: null,
-                tags: ['synergy'],
-            }
-        } else {
-            const interviewBlock = parsed.interview_answers && Object.keys(parsed.interview_answers).length > 0
-                ? `\nClarifying answers from the founder:\n${Object.entries(parsed.interview_answers)
-                    .map(([q, a]) => `- ${q}: ${a}`).join('\n')}\nUse them to refine vertical/audience/business_model.`
-                : ''
+    // If pre-classified (e.g. from Blender), skip AI
+    if (parsed.vertical && parsed.core_tech) {
+      classification = {
+        vertical: parsed.vertical,
+        core_tech: parsed.core_tech,
+        target_audience: parsed.target_audience || 'General',
+        business_model: parsed.business_model || 'TBD',
+        pain_point: ['(Pre-classified)'],
+        temporal_marker: 'Now',
+        budget_estimate: null,
+        tags: ['synergy'],
+      }
+    } else {
+      const interviewBlock =
+        parsed.interview_answers && Object.keys(parsed.interview_answers).length > 0
+          ? `\nClarifying answers from the founder:\n${Object.entries(parsed.interview_answers)
+              .map(([q, a]) => `- ${q}: ${a}`)
+              .join('\n')}\nUse them to refine vertical/audience/business_model.`
+          : ''
 
-            // Updated prompt for Russian handling
-            const prompt = `
+      // Updated prompt for Russian handling
+      const prompt = `
                 You are a startup idea classifier. Analyze the following idea:
                 Title: "${title}"
                 Description: "${description}"
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
                 Provide a JSON response with the following fields:
                 - vertical: One of ['HealthTech', 'EdTech', 'FinTech', 'ProductivityTools', 'AI-infrastructure', 'CleanTech', 'Logistics', 'Entertainment', 'Other']
                 - core_tech: Array of strings (e.g., ['LLM', 'IoT', 'Blockchain', 'AR/VR', 'No-code'])
-                - target_audience: String (e.g., 'B2B', 'B2C', 'B2B2C', 'SME')
+                - target_audience: String — SPECIFIC audience, NOT generic categories! Forbidden: 'B2B', 'B2C', 'B2B2C', 'SME', 'General', 'users', 'businesses'. Use concrete roles: 'HR managers in companies 50-200 employees', 'freelance designers', 'private clinic doctors', 'CS students'
                 - business_model: String (e.g., 'SaaS', 'Marketplace', 'Subscription', 'Advertising')
                 - pain_point: Array of strings describing the problem IN RUSSIAN
                 - temporal_marker: String (e.g., 'Now', 'Future', '2025-Q1')
@@ -69,99 +70,114 @@ export async function POST(req: NextRequest) {
                 2. If 'pain_point' or descriptions need generation, output them in RUSSIAN.
             `
 
-            try {
-                const classificationRaw = await askGemini(prompt)
-                const cleanJson = classificationRaw.replace(/```json/g, '').replace(/```/g, '').trim()
-                classification = JSON.parse(cleanJson)
+      try {
+        const classificationRaw = await askGemini(prompt)
+        const cleanJson = classificationRaw
+          .replace(/```json/g, '')
+          .replace(/```/g, '')
+          .trim()
+        classification = JSON.parse(cleanJson)
 
-                // Sanitize fields for DB constraints
-                const validBudgets = ['0-25k', '25k-50k', '50k-100k']
-                if (classification.budget_estimate && !validBudgets.includes(classification.budget_estimate)) {
-                    classification.budget_estimate = null
-                }
-
-                const validVerticals = ['HealthTech', 'EdTech', 'FinTech', 'ProductivityTools', 'AI-infrastructure', 'CleanTech', 'Logistics', 'Entertainment', 'Other']
-                if (classification.vertical && !validVerticals.includes(classification.vertical)) {
-                    classification.vertical = 'Other'
-                }
-
-                // Ensure array fields are actually arrays to satisfy DB schema
-                classification.core_tech = Array.isArray(classification.core_tech) ? classification.core_tech.map(String) : []
-                classification.pain_point = Array.isArray(classification.pain_point) ? classification.pain_point.map(String) : []
-                classification.tags = Array.isArray(classification.tags) ? classification.tags.map(String) : []
-
-            } catch (aiError) {
-                console.warn('Gemini classification failed, using fallback:', aiError)
-                classification = {
-                    vertical: 'Other',
-                    core_tech: [],
-                    target_audience: 'General',
-                    business_model: 'TBD',
-                    pain_point: ['(AI classification failed)'],
-                    temporal_marker: 'Now',
-                    budget_estimate: null,
-                    tags: ['uncategorized'],
-                }
-            }
+        // Sanitize fields for DB constraints
+        const validBudgets = ['0-25k', '25k-50k', '50k-100k']
+        if (classification.budget_estimate && !validBudgets.includes(classification.budget_estimate)) {
+          classification.budget_estimate = null
         }
 
-        let supabase = createAdminClient()
-
-        if (!supabase) {
-            console.warn('⚠️ SUPABASE_SERVICE_ROLE_KEY is missing. Falling back to standard client. Note: This may fail if RLS policies are strict.')
-            supabase = await createClient()
+        const validVerticals = [
+          'HealthTech',
+          'EdTech',
+          'FinTech',
+          'ProductivityTools',
+          'AI-infrastructure',
+          'CleanTech',
+          'Logistics',
+          'Entertainment',
+          'Other',
+        ]
+        if (classification.vertical && !validVerticals.includes(classification.vertical)) {
+          classification.vertical = 'Other'
         }
 
-        if (!supabase) {
-            return NextResponse.json({ error: 'Ошибка конфигурации базы данных (клиент недоступен)' }, { status: 500 })
+        // Ensure array fields are actually arrays to satisfy DB schema
+        classification.core_tech = Array.isArray(classification.core_tech) ? classification.core_tech.map(String) : []
+        classification.pain_point = Array.isArray(classification.pain_point)
+          ? classification.pain_point.map(String)
+          : []
+        classification.tags = Array.isArray(classification.tags) ? classification.tags.map(String) : []
+      } catch (aiError) {
+        console.warn('Gemini classification failed, using fallback:', aiError)
+        classification = {
+          vertical: 'Other',
+          core_tech: [],
+          target_audience: 'General',
+          business_model: 'TBD',
+          pain_point: ['(AI classification failed)'],
+          temporal_marker: 'Now',
+          budget_estimate: null,
+          tags: ['uncategorized'],
         }
-
-        // Check for duplicates
-        const { data: existing } = await supabase
-            .from('ideas')
-            .select('id')
-            .eq('title', title)
-            .eq('source', source || 'user')
-            .maybeSingle()
-
-        if (existing) {
-            console.log(`ℹ️ Idea already exists: ${existing.id}`)
-            return NextResponse.json(existing) // Return existing instead of creating new
-        }
-
-        const newIdea = {
-            source: source || 'user',
-            title,
-            description,
-            is_favorite,
-            ...classification,
-        }
-
-        console.log(`💾 Saving new idea to database...`)
-        const { data, error } = await supabase
-            .from('ideas')
-            .insert(newIdea)
-            .select()
-            .single()
-
-        if (error) {
-            console.error('❌ Supabase error:', error)
-            return NextResponse.json({ error: `Не удалось сохранить идею: ${error.message}` }, { status: 500 })
-        }
-
-        console.log(`✅ Idea saved successfully: ${data.id}`)
-        return NextResponse.json(data)
-    } catch (error: any) {
-        if (error instanceof z.ZodError) {
-            const msg = error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join(', ')
-            return NextResponse.json({ error: `Ошибка валидации: ${msg}` }, { status: 400 })
-        }
-        console.error('API Error:', error)
-        // Expose error message for easier debugging in production
-        return NextResponse.json({
-            error: 'Внутренняя ошибка сервера',
-            details: error.message || 'Неизвестная ошибка',
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        }, { status: 500 })
+      }
     }
+
+    let supabase = createAdminClient()
+
+    if (!supabase) {
+      console.warn(
+        '⚠️ SUPABASE_SERVICE_ROLE_KEY is missing. Falling back to standard client. Note: This may fail if RLS policies are strict.'
+      )
+      supabase = await createClient()
+    }
+
+    if (!supabase) {
+      return NextResponse.json({ error: 'Ошибка конфигурации базы данных (клиент недоступен)' }, { status: 500 })
+    }
+
+    // Check for duplicates
+    const { data: existing } = await supabase
+      .from('ideas')
+      .select('id')
+      .eq('title', title)
+      .eq('source', source || 'user')
+      .maybeSingle()
+
+    if (existing) {
+      console.log(`ℹ️ Idea already exists: ${existing.id}`)
+      return NextResponse.json(existing) // Return existing instead of creating new
+    }
+
+    const newIdea = {
+      source: source || 'user',
+      title,
+      description,
+      is_favorite,
+      ...classification,
+    }
+
+    console.log(`💾 Saving new idea to database...`)
+    const { data, error } = await supabase.from('ideas').insert(newIdea).select().single()
+
+    if (error) {
+      console.error('❌ Supabase error:', error)
+      return NextResponse.json({ error: `Не удалось сохранить идею: ${error.message}` }, { status: 500 })
+    }
+
+    console.log(`✅ Idea saved successfully: ${data.id}`)
+    return NextResponse.json(data)
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      const msg = error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ')
+      return NextResponse.json({ error: `Ошибка валидации: ${msg}` }, { status: 400 })
+    }
+    console.error('API Error:', error)
+    // Expose error message for easier debugging in production
+    return NextResponse.json(
+      {
+        error: 'Внутренняя ошибка сервера',
+        details: error.message || 'Неизвестная ошибка',
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+      },
+      { status: 500 }
+    )
+  }
 }

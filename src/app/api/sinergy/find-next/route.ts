@@ -10,14 +10,16 @@ export async function POST(req: Request) {
   try {
     const supabase = await createClient()
     const body = await req.json().catch(() => ({}))
-    // det-only (только Builder, 1 LLM-вызов) укладывается в 60s Vercel hobby-лимит.
-    // full (Builder + Optimist + Skeptic = 3 вызова) превышает лимит → timeout.
-    const mode: AgentMode = body.mode || 'det-only'
+    // Full mode: Builder + Optimist + Skeptic (3 LLM calls ≈ 18s via VPS).
+    // Det-only still available via body.mode for degraded scenarios.
+    const mode: AgentMode = body.mode || 'full'
 
+    // Exclude synergy-generated ideas to prevent degenerate loops
     const { data: ideas, error } = await supabase
       .from('ideas')
       .select('*')
       .not('vertical', 'is', null)
+      .neq('source', 'synergy')
       .order('created_at', { ascending: false })
       .limit(500)
 

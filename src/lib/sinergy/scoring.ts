@@ -51,22 +51,29 @@ export function isVerticalCompatible(a: Idea, b: Idea): boolean {
 }
 
 export function isTechSynergistic(techA: string[] = [], techB: string[] = [], threshold = 0.6): boolean {
-  const a = new Set(techA.map((t) => t.trim()))
-  const b = new Set(techB.map((t) => t.trim()))
+  const a = new Set(techA.map((t) => t.trim().toLowerCase()))
+  const b = new Set(techB.map((t) => t.trim().toLowerCase()))
 
   if (a.size === 0 || b.size === 0) return false
   if ([...a].every((t) => b.has(t)) && [...b].every((t) => a.has(t))) return false
 
+  // Shared exact tech = same stack → synergy possible (specific labels like 'ETL', 'React Native')
+  const shared = [...a].filter((t) => b.has(t))
+  if (shared.length > 0) return true
+
+  const aNorm = techA.map((t) => t.trim())
+  const bNorm = techB.map((t) => t.trim())
   let maxCompat = 0
-  techA.forEach((tA) => {
-    techB.forEach((tB) => {
-      const compat = TECH_COMPATIBILITY_MATRIX[tA]?.[tB] || 0.2
+  aNorm.forEach((tA) => {
+    bNorm.forEach((tB) => {
+      const compat = TECH_COMPATIBILITY_MATRIX[tA]?.[tB] || TECH_COMPATIBILITY_MATRIX[tB]?.[tA] || 0.2
       maxCompat = Math.max(maxCompat, compat)
     })
   })
 
   const hasSynergisticPair = SYNERGISTIC_TECH_PAIRS.some(
-    ([p1, p2]) => (a.has(p1) && b.has(p2)) || (a.has(p2) && b.has(p1))
+    ([p1, p2]) =>
+      (a.has(p1.toLowerCase()) && b.has(p2.toLowerCase())) || (a.has(p2.toLowerCase()) && b.has(p1.toLowerCase()))
   )
   if (hasSynergisticPair) maxCompat = Math.max(maxCompat, 0.85)
 
@@ -78,13 +85,20 @@ function calculateBlissScore(a: Idea, b: Idea): number {
   const techA = a.core_tech || []
   const techB = (b as any).core_tech || (b as any).technologies || []
 
+  const setA = new Set(techA.map((t: string) => t.trim().toLowerCase()))
+  const setB = new Set(techB.map((t: string) => t.trim().toLowerCase()))
+  const shared = [...setA].filter((t) => setB.has(t))
+
   let maxCompatibility = 0
   techA.forEach((tA: string) => {
     techB.forEach((tB: string) => {
-      const compat = TECH_COMPATIBILITY_MATRIX[tA]?.[tB] || 0.3
+      const compat = TECH_COMPATIBILITY_MATRIX[tA]?.[tB] || TECH_COMPATIBILITY_MATRIX[tB]?.[tA] || 0.3
       maxCompatibility = Math.max(maxCompatibility, compat)
     })
   })
+
+  // Shared exact tech stack → strong Bliss signal
+  if (shared.length > 0) maxCompatibility = Math.max(maxCompatibility, 0.85)
 
   return maxCompatibility * 10
 }

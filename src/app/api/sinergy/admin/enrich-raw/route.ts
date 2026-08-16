@@ -8,17 +8,17 @@ export const maxDuration = 300
 const EXTRACT_PROMPT = (
   title: string,
   description: string
-) => `Ты — аналитик стартапов. Извлеки структуру из новости/стартапа и напиши подробное саммари.
-Верни ТОЛЬКО валидный JSON без пояснений:
+) => `You are a startup analyst. Extract structured data from this startup/news item.
+Return ONLY valid JSON:
 {
-  "title_ru": "перевод заголовка на русский (сохрани названия продуктов/компаний)",
-  "vertical": "реальная категория из списка: FinTech, HealthTech, EdTech, AI-infrastructure, DevTools, E-commerce, SaaS, Marketplace, Productivity, LegalTech, HR-tech, ClimateTech, Creator-economy, Gaming, Crypto, BioTech, Robotics, Logistics. НЕ используй 'News'/'News (AI)'",
-  "core_tech": ["массив ключевых технологий, напр. AI, Blockchain, Computer Vision, NLP, IoT"],
-  "target_audience": "кто целевой пользователь (кратко)",
-  "business_model": "модель монетизации: SaaS, Marketplace, Subscription, Freemium, B2B, B2C, Transaction-fee, Hardware",
-  "pain_point": "какую проблему решает (кратко)",
-  "temporal_marker": "Сейчас | 1-2 года | 3-5 лет",
-  "summary": "подробное саммари новости на русском, 3-4 предложения, передай суть и значимость для стартапов"
+  "title_en": "title in English (preserve product/company names, translate if needed)",
+  "vertical": "real category from: FinTech, HealthTech, EdTech, AI-infrastructure, DevTools, E-commerce, SaaS, Marketplace, Productivity, LegalTech, HR-tech, ClimateTech, Creator-economy, Gaming, Crypto, BioTech, Robotics, Logistics. NEVER use 'News' or 'News (AI)'",
+  "core_tech": ["array of key technologies: AI, Blockchain, Computer Vision, NLP, IoT, LLM, etc"],
+  "target_audience": "specific target user — NOT generic! Forbidden: 'B2B', 'B2C', 'SME', 'General', 'users', 'businesses'. Use concrete roles: 'HR managers in companies 50-200', 'freelance designers', 'private clinic doctors', 'CS students', 'indie game developers'",
+  "business_model": "monetization model: SaaS, Marketplace, Subscription, Freemium, Transaction-fee, Hardware, API-as-a-Service",
+  "pain_point": "problem it solves (keep source language)",
+  "temporal_marker": "Now | 1-2 years | 3-5 years",
+  "summary": "detailed summary in English, 3-4 sentences, capture essence and significance for startups"
 }
 
 title: ${title}
@@ -74,13 +74,13 @@ export async function POST(req: Request) {
       const { error: updErr } = await supabase
         .from('ideas')
         .update({
-          title: parsed.title_ru ? parsed.title_ru.slice(0, 500) : item.title,
+          title: parsed.title_en ? parsed.title_en.slice(0, 500) : item.title,
           description: (parsed.summary || item.description || '').slice(0, 2000),
           vertical: parsed.vertical,
           core_tech: Array.isArray(parsed.core_tech) ? parsed.core_tech : [],
-          target_audience: parsed.target_audience || 'Общая',
+          target_audience: parsed.target_audience || 'Unclassified',
           business_model: parsed.business_model || 'SaaS',
-          pain_point: parsed.pain_point ? [parsed.pain_point] : ['Не указано'],
+          pain_point: parsed.pain_point ? [parsed.pain_point] : ['Not specified'],
           temporal_marker: parsed.temporal_marker || 'Сейчас',
           metadata: {
             ...(item.metadata || {}),

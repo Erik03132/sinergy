@@ -10,131 +10,152 @@ import { sanityCheck, isAntiPattern } from '../scoring'
 import { SYNERGY_BANNED_PATTERNS } from '../constants'
 
 export interface SkepticOutput {
-    is_viable: boolean
-    risks: string[]
-    anti_pattern_check: string
-    competitors_note: string
-    failure_probability: 'low' | 'medium' | 'high'
+  is_viable: boolean
+  risks: string[]
+  anti_pattern_check: string
+  competitors_note: string
+  failure_probability: 'low' | 'medium' | 'high'
 }
 
-export async function skepticValidate(a: Idea, b: Idea, synergyTitle: string, synergyDesc: string): Promise<SkepticOutput> {
-    const deterministic: SkepticOutput = {
-        is_viable: true,
-        risks: generateDeterministicRisks(a, b),
-        anti_pattern_check: generateAntiPatternCheck(synergyTitle, synergyDesc),
-        competitors_note: generateDeterministicCompetitors(a, b),
-        failure_probability: 'medium'
+export async function skepticValidate(
+  a: Idea,
+  b: Idea,
+  synergyTitle: string,
+  synergyDesc: string
+): Promise<SkepticOutput> {
+  const deterministic: SkepticOutput = {
+    is_viable: true,
+    risks: generateDeterministicRisks(a, b),
+    anti_pattern_check: generateAntiPatternCheck(synergyTitle, synergyDesc),
+    competitors_note: generateDeterministicCompetitors(a, b),
+    failure_probability: 'medium',
+  }
+
+  if (!sanityCheck(a, b)) {
+    return { ...deterministic, is_viable: false }
+  }
+
+  if (
+    isAntiPattern(
+      { synergy_title: synergyTitle, synergy_description: synergyDesc, logic_chain: '' },
+      SYNERGY_BANNED_PATTERNS
+    )
+  ) {
+    return {
+      ...deterministic,
+      is_viable: false,
+      anti_pattern_check: 'Обнаружен антипаттерн: продукт звучит как общая платформа/агрегатор.',
     }
+  }
 
-    if (!sanityCheck(a, b)) {
-        return { ...deterministic, is_viable: false }
-    }
+  try {
+    const apiKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY
+    if (!apiKey) return deterministic
 
-    if (isAntiPattern({ synergy_title: synergyTitle, synergy_description: synergyDesc, logic_chain: '' }, SYNERGY_BANNED_PATTERNS)) {
-        return {
-            ...deterministic,
-            is_viable: false,
-            anti_pattern_check: 'Обнаружен антипаттерн: продукт звучит как общая платформа/агрегатор.'
-        }
-    }
+    const prompt = `You are a skeptical investor. Find REAL reasons why this startup synergy will NOT work:
 
-    try {
-        const apiKey = process.env.GEMINI_API_KEY || process.env.OPENROUTER_API_KEY
-        if (!apiKey) return deterministic
+STARTUP A:
+- Product: ${a.title}
+- Audience: ${a.target_audience || '-'}
+- Technology: ${a.core_tech?.join(', ') || '-'}
+- Monetization: ${a.business_model || '-'}
+- Problem: ${a.pain_point?.[0] || '-'}
 
-        const prompt = `Ты — скептик-инвестор. Найди реальные причины, почему эта стартап-синергия НЕ взлетит:
+STARTUP B:
+- Product: ${b.title}
+- Audience: ${b.target_audience || '-'}
+- Technology: ${b.core_tech?.join(', ') || '-'}
+- Monetization: ${b.business_model || '-'}
+- Problem: ${b.pain_point?.[0] || '-'}
 
-СТАРТАП A:
-- Продукт: ${a.title}
-- Аудитория: ${a.target_audience || '-'}
-- Технология: ${a.core_tech?.join(', ') || '-'}
-- Монетизация: ${a.business_model || '-'}
-- Проблема: ${a.pain_point?.[0] || '-'}
+Synergy: "${synergyTitle}" — ${synergyDesc}
 
-СТАРТАП B:
-- Продукт: ${b.title}
-- Аудитория: ${b.target_audience || '-'}
-- Технология: ${b.core_tech?.join(', ') || '-'}
-- Монетизация: ${b.business_model || '-'}
-- Проблема: ${b.pain_point?.[0] || '-'}
+Find SPECIFIC risks:
+1. Market risk: is the market too small? Who tried this and failed?
+2. Execution risk: what is the hardest part technically/organizationally?
+3. Adoption risk: why won't users switch from current solutions?
+4. Competitor risk: which big player can kill this product with one feature?
 
-Синергия: "${synergyTitle}" — ${synergyDesc}
-
-Найди КОНКРЕТНЫЕ риски:
-1. Market risk: рынок слишком мал? Кто уже пробовал и провалился?
-2. Execution risk: что самое сложное технически/организационно?
-3. Adoption risk: почему пользователи не переключатся с текущих решений?
-4. Competitor risk: кто из крупных игроков может убить продукт одной фичей?
-
-Ответь JSON:
+Answer in JSON:
 {
   "is_viable": true/false,
-  "risks": ["конкретный риск 1", "конкретный риск 2", "конкретный риск 3"],
-  "anti_pattern_check": "1 предложение: это реально новый продукт или просто buzzwords?",
-  "competitors_note": "1 предложение: кто конкретно может убить этот продукт?",
+  "risks": ["specific risk 1", "specific risk 2", "specific risk 3"],
+  "anti_pattern_check": "1 sentence: is this a real new product or just buzzwords?",
+  "competitors_note": "1 sentence: who specifically can kill this product?",
   "failure_probability": "low|medium|high"
 }
 
-Язык: РУССКИЙ. Будь жёстким и конкретным.`
+Be harsh and specific. No generic warnings.`
 
-        const raw = await askGemini(prompt, { search: false })
-        const jsonMatch = raw.match(/\{[\s\S]*\}/)
-        if (!jsonMatch) return deterministic
+    const raw = await askGemini(prompt, { search: false })
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return deterministic
 
-        const ai = JSON.parse(jsonMatch[0])
-        return {
-            is_viable: ai.is_viable !== false,
-            risks: Array.isArray(ai.risks) ? ai.risks : deterministic.risks,
-            anti_pattern_check: ai.anti_pattern_check || deterministic.anti_pattern_check,
-            competitors_note: ai.competitors_note || deterministic.competitors_note,
-            failure_probability: ai.failure_probability || deterministic.failure_probability
-        }
-    } catch {
-        return deterministic
+    const ai = JSON.parse(jsonMatch[0])
+    return {
+      is_viable: ai.is_viable !== false,
+      risks: Array.isArray(ai.risks) ? ai.risks : deterministic.risks,
+      anti_pattern_check: ai.anti_pattern_check || deterministic.anti_pattern_check,
+      competitors_note: ai.competitors_note || deterministic.competitors_note,
+      failure_probability: ai.failure_probability || deterministic.failure_probability,
     }
+  } catch {
+    return deterministic
+  }
 }
 
 function generateDeterministicRisks(a: Idea, b: Idea): string[] {
-    const risks: string[] = []
-    const audA = a.target_audience?.toLowerCase() || ''
-    const audB = b.target_audience?.toLowerCase() || ''
+  const risks: string[] = []
+  const audA = a.target_audience?.toLowerCase() || ''
+  const audB = b.target_audience?.toLowerCase() || ''
 
-    if (audA && audB && audA === audB) {
-        risks.push('Обе идеи нацелены на одну аудиторию — узкий рынок')
-    } else if (audA && audB && audA !== audB) {
-        risks.push('Разные аудитории — сложность go-to-market')
-    }
+  if (audA && audB && audA === audB) {
+    risks.push('Both ideas target the same audience — narrow market')
+  } else if (audA && audB && audA !== audB) {
+    risks.push('Different audiences — go-to-market complexity')
+  }
 
-    if (!a.core_tech?.length || !b.core_tech?.length) {
-        risks.push('Не указаны ключевые технологии — риск нереализуемости')
-    }
+  if (!a.core_tech?.length || !b.core_tech?.length) {
+    risks.push('Key technologies missing — feasibility risk')
+  }
 
-    if (a.business_model === 'Marketplace' && b.business_model === 'Marketplace') {
-        risks.push('Маркетплейс + маркетплейс = холодный старт для двустороннего рынка')
-    }
+  if (a.business_model === 'Marketplace' && b.business_model === 'Marketplace') {
+    risks.push('Marketplace + marketplace = cold start for a two-sided market')
+  }
 
-    if (risks.length === 0) {
-        risks.push('Требуется deeper dive: не хватает данных для детерминированной оценки')
-    }
+  if (risks.length === 0) {
+    risks.push('Requires deeper dive: not enough data for deterministic assessment')
+  }
 
-    return risks
+  return risks
 }
 
 function generateAntiPatternCheck(title: string, desc: string): string {
-    const lower = `${title} ${desc}`.toLowerCase()
-    const bad = ['платформа', 'агрегатор', 'универсальный', 'дашборд', 'экосистема']
-    const found = bad.filter(w => lower.includes(w))
-    if (found.length > 0) {
-        return `Обнаружены подозрительные паттерны: ${found.join(', ')}. Убедитесь, что продукт решает конкретную задачу.`
-    }
-    return 'Проверка на антипаттерн пройдена: продукт выглядит конкретным, а не абстрактной платформой.'
+  const lower = `${title} ${desc}`.toLowerCase()
+  const bad = [
+    'платформа',
+    'агрегатор',
+    'универсальный',
+    'дашборд',
+    'экосистема',
+    'platform',
+    'aggregator',
+    'universal',
+    'dashboard',
+    'ecosystem',
+  ]
+  const found = bad.filter((w) => lower.includes(w))
+  if (found.length > 0) {
+    return `Suspicious patterns detected: ${found.join(', ')}. Make sure the product solves a specific problem.`
+  }
+  return 'Anti-pattern check passed: the product looks specific, not an abstract platform.'
 }
 
 function generateDeterministicCompetitors(a: Idea, b: Idea): string {
-    const vertA = a.vertical?.toLowerCase() || ''
-    const vertB = b.vertical?.toLowerCase() || ''
-    if (vertA && vertB && vertA !== vertB) {
-        return `Прямых конкурентов на стыке ${vertA} и ${vertB} пока нет. Возможна конкуренция с узкими игроками в каждом домене.`
-    }
-    return 'Рынок требует более детального анализа конкурентов. Рекомендуется провести ручной search.'
+  const vertA = a.vertical?.toLowerCase() || ''
+  const vertB = b.vertical?.toLowerCase() || ''
+  if (vertA && vertB && vertA !== vertB) {
+    return `No direct competitors at the intersection of ${vertA} and ${vertB} yet. Possible competition from niche players in each domain.`
+  }
+  return 'Market requires more detailed competitor analysis. Manual search recommended.'
 }

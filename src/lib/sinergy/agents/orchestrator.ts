@@ -11,7 +11,16 @@
 
 import { Idea, SynergyResult } from '@/types/sinergy'
 import { createClient } from '@/lib/supabase/server'
-import { calculateConsensusSynergyScore, calculatePairCreativityScore, sanityCheck } from '../scoring'
+import {
+  calculateConsensusSynergyScore,
+  calculatePairCreativityScore,
+  calculateBlueOceanPotential,
+  calculateKnowledgeTransferScore,
+  sanityCheck,
+  isAntiPattern,
+  isTechSynergistic,
+} from '../scoring'
+import { SYNERGY_BANNED_PATTERNS } from '../constants'
 import { builderBuild, BuilderResult } from './builder'
 import { optimistAnalyze, OptimistOutput } from './optimist'
 import { skepticValidate, SkepticOutput } from './skeptic'
@@ -62,8 +71,12 @@ interface PairCandidate {
 }
 
 function pickRandom<T>(items: T[], count: number): T[] {
-  const shuffled = [...items].sort(() => Math.random() - 0.5)
-  return shuffled.slice(0, count)
+  const arr = [...items]
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[arr[i], arr[j]] = [arr[j], arr[i]]
+  }
+  return arr.slice(0, count)
 }
 
 /**
@@ -116,9 +129,10 @@ function selectPairs(ideas: Idea[], pairCount: number = 80): PairCandidate[] {
     const b = pool[j]
 
     if (!sanityCheck(a, b)) continue
+    if (!isTechSynergistic(pool[i].core_tech || [], pool[j].core_tech || [])) continue
 
     const score = calculateConsensusSynergyScore(a, b)
-    if (score > 3) {
+    if (score >= 4.0) {
       scoredPairs.push({ a, b, score })
     }
   }
@@ -181,10 +195,27 @@ export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {
 
   for (const pair of pairs) {
     const { a, b, score } = pair
+    console.log(`[blender] pair: "${a.title?.slice(0, 40)}" × "${b.title?.slice(0, 40)}" (score ${score.toFixed(1)})`)
 
     // 1. Builder ALWAYS runs (AI-powered primary, deterministic fallback)
     const built = await builderBuild(a, b)
-    if (!built) continue
+    if (!built) {
+      console.log('[blender] reject: builder returned null')
+      continue
+    }
+
+    // Anti-pattern gate — always, regardless of mode.
+    // Title-only: 'platform'/'integration' are legit words in English prose,
+    // banning them in descriptions kills every real product ("EnerGenius AI Ops").
+    if (
+      isAntiPattern(
+        { synergy_title: built.synergy_title, synergy_description: '', logic_chain: '' },
+        SYNERGY_BANNED_PATTERNS
+      )
+    ) {
+      console.log(`[blender] reject: anti-pattern in "${built.synergy_title?.slice(0, 60)}"`)
+      continue
+    }
 
     // 2. Run Optimist + Skeptic in parallel (if AI available)
     let optimistOutput: OptimistOutput | null = null
@@ -197,7 +228,22 @@ export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {
       ])
     }
 
-    // 3. Merge into SynergyResult
+    // 3. Independent deterministic score (not self-graded by AI generator)
+    const detScore = calculateConsensusSynergyScore(a, b)
+    const blueOceanScore = Math.round(calculateBlueOceanPotential(a, b) * 10) / 10
+    const ktScore = Math.round(calculateKnowledgeTransferScore(a, b) * 10) / 10
+    const skepticMultiplier = skepticOutput
+      ? skepticOutput.is_viable
+        ? 1.0
+        : skepticOutput.failure_probability === 'high'
+          ? 0.5
+          : 0.6
+      : mode === 'full'
+        ? 1.0
+        : 0.7 // det-only without skeptic → 0.7 penalty
+    const finalTotal = Math.round(detScore * skepticMultiplier * 10) / 10
+
+    // 4. Merge into SynergyResult
     const result: any = {
       status: 'synergy_found' as const,
       mode: b.id?.startsWith('catalyst-') ? 'Стратегическая эволюция' : 'Гибридный синтез',
@@ -209,17 +255,17 @@ export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {
       classification: built.classification,
       thinking_models: {
         ...built.thinking_models,
-        medici_effect: `Пересечение доменов: ${a.vertical || 'A'} × ${b.vertical || 'B'} создаёт эффект Медичи.`,
-        analogy_bridge: `${a.title} как аналог ${b.title}: перенос бизнес-модели на новую аудиторию.`,
-        inversion: `Что если не ${a.business_model || 'продавать'}, а ${b.business_model || 'отдавать'}?`,
+        medici_effect: `Domain intersection: ${a.vertical || 'A'} × ${b.vertical || 'B'} creates the Medici effect.`,
+        analogy_bridge: `${a.title} as an analog of ${b.title}: transferring the business model to a new audience.`,
+        inversion: `What if instead of ${a.business_model || 'selling'}, you ${b.business_model || 'give it away'}?`,
       },
       defensibility: built.defensibility,
       scores: {
-        total: built.scores.total,
-        blue_ocean: optimistOutput?.scores.blue_ocean ?? built.scores.blue_ocean,
-        knowledge_transfer: optimistOutput?.scores.knowledge_transfer ?? built.scores.knowledge_transfer,
+        total: finalTotal,
+        blue_ocean: blueOceanScore,
+        knowledge_transfer: ktScore,
       },
-      synergy_score: Math.round(built.scores.total),
+      synergy_score: Math.round(finalTotal),
       components: [a, b as any],
 
       // Enriched by agents (if available)
@@ -228,7 +274,10 @@ export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {
       anti_pattern_check: skepticOutput?.anti_pattern_check || built.anti_pattern_check,
     }
 
-    if (skepticOutput && !skepticOutput.is_viable) {
+    // Hard-skip only on HIGH failure probability; medium rejections shown with score penalty.
+    // LLM skeptics are systematically harsh — every idea has some risk.
+    if (skepticOutput && !skepticOutput.is_viable && skepticOutput.failure_probability === 'high') {
+      console.log(`[blender] reject: skeptic high risk: ${skepticOutput.risks?.[0]?.slice(0, 100)}`)
       result.status = 'no_more_synergy' as const
       continue
     }
@@ -246,6 +295,7 @@ export async function runBlender(ideas: Idea[], options: OrchestratorOptions = {
 export async function saveSynergy(supabase: any, result: SynergyResult, a: Idea, b: Idea, scores: any, mode: string) {
   if (!result.synergy_title) return null
 
+  // Save only to synergies table — idea is materialized on user favorite (not auto-saved)
   const { error: synError } = await supabase.from('synergies').insert({
     idea_a_id: a.id,
     idea_b_id: b.id?.startsWith('catalyst-') ? null : b.id,
@@ -264,33 +314,5 @@ export async function saveSynergy(supabase: any, result: SynergyResult, a: Idea,
   })
   if (synError) console.error('[saveSynergy] synergies insert error:', synError.message)
 
-  const newIdea = {
-    source: 'synergy',
-    title: result.synergy_title,
-    description: result.synergy_description || '',
-    is_favorite: false,
-    is_synergy: true,
-    vertical: result.classification?.vertical || 'Другое',
-    core_tech: result.classification?.core_tech || [],
-    target_audience: result.classification?.target_audience || 'Общая',
-    business_model: result.classification?.business_model || 'SaaS',
-    pain_point: ['Синтезировано блендером'],
-    temporal_marker: 'Сейчас',
-    metadata: {
-      logic_chain: result.logic_chain,
-      score: scores?.total,
-      mode,
-      components: [a, b],
-      is_auto_saved: true,
-      ai_trend_forecast: result.ai_trend_forecast,
-    },
-  }
-
-  try {
-    const { data: saved } = await supabase.from('ideas').insert(newIdea).select('id').single()
-    return saved?.id || null
-  } catch (e: any) {
-    console.error('[saveSynergy] ideas insert error:', e?.message)
-    return null
-  }
+  return null
 }

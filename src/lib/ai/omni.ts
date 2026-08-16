@@ -9,14 +9,17 @@ import { askOpenRouter } from './openrouter'
 
 const OMNIROUTE_URL = process.env.OMNIROUTE_URL || 'http://localhost:20128/v1/chat/completions'
 
-// Бесплатные модели VPS, проверены 14-15.08.2026. auto/fast — самый быстрый (1.5s),
-// free-cascade часто перегружен (до 30s+). Порядок: от быстрого к медленному.
-const OMNI_MODELS = ['auto/fast', 'auto/best-free', 'auto/cheap', 'free-cascade', 'oc/deepseek-v4-flash-free']
+// ⚠️ ВЛАДЕЛЕЦ ЗАПРЕТИЛ МЕНЯТЬ КОМБО БЕЗ ЕГО ЯВНОЙ КОМАНДЫ (16.08.2026).
+// Единственное разрешённое комбо: auto/free-coding на VPS OmniRoute
+// (OpenCode Zen free weights 1-5 → OpenRouter :free weights 6-20, стратегия priority).
+// Встроенные пулы auto/fast, auto/best-free, auto/cheap, free-cascade ЗАПРЕЩЕНЫ —
+// они резолвятся в ПЛАТНЫЕ модели OpenRouter и падают с "Insufficient credits".
+const OMNI_MODELS = ['auto/free-coding', 'oc/deepseek-v4-flash-free']
 
-// VPS OmniRoute (провайдер OpenCode) нестабилен из Vercel: часто hangs/empty до 30s+.
-// Короткий таймаут (4s) — быстро уходим в fallback на OpenRouter (nemotron ~3s).
-// Сумма VPS-таймаутов (5 моделей × 4s = 20s) + OpenRouter (3s) = 23s < 60s лимита Vercel.
-const VPS_TIMEOUT_MS = 4000
+// Каскад auto/free-coding использует reasoning-модели (hy3-free, nemotron-free):
+// TTFT 5-15s — короткий таймаут обрывает валидные ответы.
+// 2 модели × 20s = 40s worst case до fallback на OpenRouter.
+const VPS_TIMEOUT_MS = 20000
 
 // Каскад из ДВУХ провайдеров (по запросу 15.08):
 // 1) VPS OmniRoute — провайдер OpenCode (тариф Zen, бесплатные модели: free-cascade, auto/fast...)
