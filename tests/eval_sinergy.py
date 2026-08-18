@@ -2,7 +2,6 @@
 Sinergy Eval Suite — evaluates scoring engine, AI parsers, dedup.
 All logic tests run via tsx (TypeScript Execute) for direct TS import.
 """
-import json
 import os
 import subprocess
 import sys
@@ -320,8 +319,8 @@ if __name__ == "__main__":
         arg = sys.argv[1].lstrip("--")
 
     print(f"\n{'='*60}")
-    print(f"  Sinergy Eval Suite")
-    print(f"  Startup Synergy Engine — scoring, AI, dedup")
+    print("  Sinergy Eval Suite")
+    print("  Startup Synergy Engine — scoring, AI, dedup")
     if filter_cat:
         print(f"  Filter: {filter_cat}")
     print(f"{'='*60}")
