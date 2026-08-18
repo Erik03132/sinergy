@@ -288,19 +288,29 @@ async function enrichRawItems(
         if (!rows || rows.length === 0) continue
         if (rows[0].metadata?.is_extracted) continue
 
-        const prompt = `Переведи заголовок и описание стартапа/новости на русский язык. Сохрани термины и названия продуктов. Верни ТОЛЬКО JSON: {"title_ru":"...","description_ru":"..."}
+        const prompt = `Извлеки структуру из новости о стартапе/продукте. Сохрани термины и названия. Верни ТОЛЬКО JSON: {"title_ru":"...","summary":"...","vertical":"...","core_tech":["..."],"target_audience":"...","business_model":"...","pain_point":"..."}
 
 title: ${item.title}
 description: ${item.description || item.title}`
         let title = item.title
         let description = item.description || item.title
+        let coreTech: string[] = []
+        let vertical = resolveNewsVertical(title, description)
+        let targetAudience = 'Общая'
+        let businessModel = 'SaaS'
+        let painPoint: string[] = ['Не указано']
         try {
           const raw = await askGemini(prompt)
           const json = raw.match(/\{[\s\S]*\}/)
           if (json) {
             const parsed = JSON.parse(json[0])
             if (parsed.title_ru) title = parsed.title_ru
-            if (parsed.description_ru) description = parsed.description_ru
+            if (parsed.summary) description = parsed.summary
+            if (Array.isArray(parsed.core_tech)) coreTech = parsed.core_tech
+            if (parsed.vertical) vertical = parsed.vertical
+            if (parsed.target_audience) targetAudience = parsed.target_audience
+            if (parsed.business_model) businessModel = parsed.business_model
+            if (parsed.pain_point) painPoint = [parsed.pain_point]
           }
         } catch (e: any) {
           err(`enrich translate failed for ${item.title.slice(0, 40)}: ${e?.message}`)
@@ -311,7 +321,11 @@ description: ${item.description || item.title}`
           .update({
             title: title.slice(0, 500),
             description: description.slice(0, 2000),
-            vertical: resolveNewsVertical(title, description),
+            vertical,
+            core_tech: coreTech,
+            target_audience: targetAudience,
+            business_model: businessModel,
+            pain_point: painPoint,
             metadata: {
               ...(rows[0].metadata || {}),
               is_extracted: true,
